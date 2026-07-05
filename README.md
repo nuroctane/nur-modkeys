@@ -2,7 +2,7 @@
 
 A browser-based mechanical keyboard configurator and 3D visualization tool. Build, customize, and share your dream keyboard — entirely in the browser.
 
-**[Try it live](https://modkeys.app)** (replace with actual URL)
+**[Try it live](https://modkeys.vercel.app/)**
 
 ---
 
