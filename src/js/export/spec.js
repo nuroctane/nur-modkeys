@@ -1,48 +1,62 @@
 import { state } from '../core/state.js';
 import { LAYOUTS } from '../data/layouts.js';
 import { COLORWAYS } from '../data/colorways.js';
-import { CASES, FINISHES, PLATES, SWITCHES, MATERIALS, EXTRAS, PROFILES } from '../data/components.js';
+import { CASES, FINISHES, PLATES, SWITCHES, MATERIALS, EXTRAS } from '../data/components.js';
+import { effectiveColorway } from '../core/update.js';
+import { getOverride, getAllEntries, keyId } from '../core/perKey.js';
 import { exportKLE } from './kle.js';
 
 export function generateSpec() {
   const L = LAYOUTS[state.layout];
-  const cw = COLORWAYS[state.colorway];
-  const sw = SWITCHES[state.sw];
-  const totalKeys = L.rows().reduce((sum, row) => sum + row.length, 0);
+  const cw = effectiveColorway();
+  const cwName = state.customColors ? 'Custom' : COLORWAYS[state.colorway].name;
+  const countKeys = L.rows().reduce((sum, r) => sum + r.length, 0);
+
+  const perKeyInfo = [];
+  getAllEntries().forEach(([id, ov]) => {
+    perKeyInfo.push({
+      key: id,
+      customText: ov.customText || undefined,
+      fgColor: ov.fgColor || undefined,
+      bgColor: ov.bgColor || undefined,
+      glow: ov.glow || undefined,
+      hasImage: !!ov.imageData,
+      imageBehindText: ov.imageBehindText || undefined,
+      fontSize: ov.fontSize || undefined,
+    });
+  });
 
   const spec = {
-    name: `MODKEYS ${L.pct}`,
-    colorway: cw.name,
+    name: `MODKEYS ${L.pct} — ${cwName}`,
     generated: new Date().toISOString(),
-    version: '1.0',
+    configurator: 'MODKEYS by nur',
 
     layout: {
       name: L.name,
       size: L.pct,
-      totalKeys,
-      keySpacing: '19.05mm',
-      stabilizers: [
-        { size: '6.25U', qty: 1, position: 'Spacebar' },
-        { size: '2U', qty: 4, position: 'Shift, Enter, Backspace' },
-      ],
+      totalKeys: countKeys,
+      spacing: '19.05mm standard',
+      stabilizers: '6.25U space x1, 2U x4',
     },
 
     keycaps: {
-      profile: PROFILES[state.profile].name,
+      profile: state.profile.toUpperCase(),
       material: MATERIALS[state.material].name,
       legendMethod: 'Doubleshot injection',
       colorway: {
+        name: cwName,
         alpha: { bg: cw.a.bg, fg: cw.a.fg },
-        modifier: { bg: cw.m.bg, fg: cw.m.fg },
+        mod: { bg: cw.m.bg, fg: cw.m.fg },
         accent: { bg: cw.x.bg, fg: cw.x.fg },
       },
+      customKeys: perKeyInfo.length > 0 ? perKeyInfo : undefined,
     },
 
     case: {
       color: CASES[state.caseColor].name,
-      colorHex: CASES[state.caseColor].c,
+      hex: CASES[state.caseColor].c,
       finish: FINISHES[state.finish].name,
-      suggestedMaterial: 'Aluminum (CNC)',
+      suggestedMaterial: 'Aluminum CNC',
     },
 
     plate: {
@@ -51,16 +65,16 @@ export function generateSpec() {
     },
 
     switches: {
-      name: sw.name,
-      type: sw.type,
-      force: sw.force,
+      name: SWITCHES[state.sw].name,
+      type: SWITCHES[state.sw].type,
+      force: SWITCHES[state.sw].force,
       mount: 'Cherry MX',
-      quantity: totalKeys,
+      quantity: countKeys,
     },
 
-    accessories: Object.entries(EXTRAS)
-      .filter(([id]) => state.extras[id])
-      .map(([, e]) => e.name),
+    accessories: Object.entries(state.extras)
+      .filter(([, v]) => v)
+      .map(([id]) => EXTRAS[id].name),
 
     lighting: {
       mode: state.light.mode,
@@ -69,13 +83,13 @@ export function generateSpec() {
     },
 
     manufacturing: {
-      pcbStandard: 'GH60 compatible',
-      usbType: 'USB-C',
-      dimensions: '285mm x 95mm (standard)',
-      notes: 'All measurements nominal. Verify with manufacturer before production.',
+      pcb: 'GH60 compatible',
+      usb: 'USB-C',
+      dimensions: `${Math.round(L.total * 19.05)}mm x 95mm`,
+      notes: 'Custom image keys require dye-sublimation or UV printing (not doubleshot).',
     },
 
-    kleData: exportKLE(),
+    kleLayout: exportKLE(),
   };
 
   return JSON.stringify(spec, null, 2);
@@ -87,7 +101,7 @@ export function downloadSpec() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `modkeys-${state.layout}-${state.colorway}-spec.json`;
+  a.download = `modkeys-${state.layout}-${state.customColors ? 'custom' : state.colorway}-spec.json`;
   a.click();
   URL.revokeObjectURL(url);
 }

@@ -3,15 +3,15 @@ import gsap from 'gsap';
 window.gsap = gsap;
 
 import { state, stateSlice } from './core/state.js';
-import { registerSyncUI, setState } from './core/update.js';
+import { registerSyncUI, setState, undo, redo } from './core/update.js';
 import { rebuildBoard, preloadEmoji } from './core/keyboard.js';
-import { ctrl, setView } from './core/controls.js';
+import { ctrl, setView, onKeyEditClick } from './core/controls.js';
 import {
   renderer, scene, camera, root,
   matAlpha, matMod, matAccent, matCase, matPlate, matStem,
   capMat, sRGB, applyPlateFinish, uni,
 } from './core/scene.js';
-import { renderPanel, syncUI } from './ui/panels.js';
+import { renderPanel, syncUI, showKeyEditor, hideKeyEditor } from './ui/panels.js';
 import { initTheme } from './ui/theme.js';
 import { toast } from './ui/toast.js';
 import { openLibrary, openGallery, openSwitchesModal, openAccessories, closeModal } from './ui/modals.js';
@@ -21,6 +21,9 @@ import { CASES, PLATES, SWITCHES } from './data/components.js';
 import { downloadKLE, copyKLE } from './export/kle.js';
 import { downloadSVG } from './export/svg.js';
 import { downloadSpec } from './export/spec.js';
+import { loadHash, shareURL } from './core/shrinker.js';
+import { clearAllOverrides } from './core/perKey.js';
+import { resetHistory } from './core/history.js';
 
 registerSyncUI(syncUI);
 
@@ -66,6 +69,21 @@ document.getElementById('toolReset').addEventListener('click', () => {
   setView('3d');
 });
 
+/* undo/redo/share */
+document.getElementById('toolUndo')?.addEventListener('click', () => {
+  const ok = undo();
+  if (!ok) toast('Nothing to undo');
+});
+document.getElementById('toolRedo')?.addEventListener('click', () => {
+  const ok = redo();
+  if (!ok) toast('Nothing to redo');
+});
+document.getElementById('toolShare')?.addEventListener('click', () => {
+  const url = shareURL(stateSlice());
+  if (url) { navigator.clipboard.writeText(url); toast('Share link copied!'); }
+  else toast('Could not create share link');
+});
+
 /* export buttons */
 document.getElementById('exportKLE').addEventListener('click', downloadKLE);
 document.getElementById('exportSVG').addEventListener('click', downloadSVG);
@@ -83,18 +101,41 @@ document.getElementById('panelBody').addEventListener('click', (ev) => {
   if (ev.target.closest('#libOpen')) openLibrary();
 });
 
-/* sidebar toggle shortcut — no cart */
 /* featured builds carousel */
 document.getElementById('builds').addEventListener('click', (ev) => {
   const card = ev.target.closest('.bcard');
   if (!card) return;
   const p = PRESETS.find((x) => x.id === card.dataset.id);
   if (!p) return;
-  /* apply preset — similar to setState but bulk */
   const patch = Object.assign({}, p.s, { selectedPreset: p.id });
   if (patch.colorway) state.colorway = patch.colorway;
   setState(patch);
   toast(p.name + ' loaded');
+});
+
+/* key editor */
+onKeyEditClick((keyData) => {
+  showKeyEditor(keyData);
+});
+
+/* keyboard shortcuts */
+document.addEventListener('keydown', (ev) => {
+  if (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA') return;
+  if ((ev.ctrlKey || ev.metaKey) && ev.key === 'z') {
+    ev.preventDefault();
+    const ok = undo();
+    if (!ok) toast('Nothing to undo');
+    else toast('Undo');
+  }
+  if ((ev.ctrlKey || ev.metaKey) && ev.key === 'y') {
+    ev.preventDefault();
+    const ok = redo();
+    if (!ok) toast('Nothing to redo');
+    else toast('Redo');
+  }
+  if (ev.key === 'Escape') {
+    hideKeyEditor();
+  }
 });
 
 /* resize */
@@ -130,16 +171,9 @@ function genThumbs() {
       matMod.color.copy(sRGB(cw.m.bg));
       matAccent.color.copy(sRGB(cw.x.bg));
     }
-    if (s.caseColor) {
-      matCase.color.copy(sRGB(CASES[s.caseColor].c));
-    }
-    if (s.plate) {
-      matPlate.color.copy(sRGB(PLATES[s.plate].c));
-      applyPlateFinish(s.plate);
-    }
-    if (s.sw) {
-      matStem.color.copy(sRGB(SWITCHES[s.sw].dot));
-    }
+    if (s.caseColor) matCase.color.copy(sRGB(CASES[s.caseColor].c));
+    if (s.plate) { matPlate.color.copy(sRGB(PLATES[s.plate].c)); applyPlateFinish(s.plate); }
+    if (s.sw) matStem.color.copy(sRGB(SWITCHES[s.sw].dot));
     if (s.light) {
       const modes = { wave: 0, static: 1, breathe: 2, off: 3 };
       Object.assign(state.light, s.light);
@@ -150,7 +184,6 @@ function genThumbs() {
     renderer.render(scene, camera);
     thumbs[p.id] = renderer.domElement.toDataURL('image/png');
   });
-  /* restore */
   Object.assign(state, snap);
   ctrl.theta = sc.theta;
   ctrl.phi = sc.phi;
@@ -160,7 +193,6 @@ function genThumbs() {
   renderer.setSize(r.width, r.height, false);
   camera.aspect = r.width / r.height;
   camera.updateProjectionMatrix();
-  /* restore scene materials */
   if (snap.colorway) {
     const cw = COLORWAYS[snap.colorway];
     matAlpha.color.copy(sRGB(cw.a.bg));
@@ -168,10 +200,7 @@ function genThumbs() {
     matAccent.color.copy(sRGB(cw.x.bg));
   }
   if (snap.caseColor) matCase.color.copy(sRGB(CASES[snap.caseColor].c));
-  if (snap.plate) {
-    matPlate.color.copy(sRGB(PLATES[snap.plate].c));
-    applyPlateFinish(snap.plate);
-  }
+  if (snap.plate) { matPlate.color.copy(sRGB(PLATES[snap.plate].c)); applyPlateFinish(snap.plate); }
   if (snap.sw) matStem.color.copy(sRGB(SWITCHES[snap.sw].dot));
 }
 
@@ -198,6 +227,12 @@ ctrl.apply();
 tick();
 requestAnimationFrame(() => {
   requestAnimationFrame(() => {
+    /* restore shared URL */
+    const hashData = loadHash();
+    if (hashData) {
+      setState(Object.assign({}, hashData));
+      resetHistory(stateSlice());
+    }
     genThumbs();
     renderPanel('keycaps');
     syncUI();

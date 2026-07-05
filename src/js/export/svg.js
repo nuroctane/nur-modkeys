@@ -1,22 +1,27 @@
 import { state } from '../core/state.js';
 import { LAYOUTS } from '../data/layouts.js';
 import { COLORWAYS } from '../data/colorways.js';
+import { effectiveColorway } from '../core/update.js';
+import { getEffectiveText, getEffectiveFg, getEffectiveBg, getOverride, keyId } from '../core/perKey.js';
+
+function escapeXml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 
 export function generateSVG() {
   const L = LAYOUTS[state.layout];
   const rows = L.rows();
-  const cw = COLORWAYS[state.colorway];
+  const cw = effectiveColorway();
   const colorMap = { a: cw.a.bg, m: cw.m.bg, x: cw.x.bg };
   const fgColorMap = { a: cw.a.fg, m: cw.m.fg, x: cw.x.fg };
 
-  const UNIT = 19.05; // mm per key unit
-  const GAP = 0.4; // mm gap between keys
+  const UNIT = 19.05;
+  const GAP = 0.4;
   const KEY_W = UNIT - GAP;
   const KEY_H = UNIT - GAP;
-  const K_R = 2; // corner radius
+  const K_R = 2;
   const PAD = 20;
 
-  /* calculate dimensions */
   let maxW = 0, totalH = 0;
   rows.forEach((row) => {
     let rowW = 0;
@@ -41,20 +46,27 @@ export function generateSVG() {
 
   rows.forEach((row, ri) => {
     let cur = 0;
-    row.forEach((k) => {
+    row.forEach((k, ci) => {
       const start = k.x !== undefined ? k.x : cur;
       const kw = k.w || 1;
       const x = start * UNIT + GAP / 2;
       const y = ri * UNIT + GAP / 2;
       const w = kw * UNIT - GAP;
       const h = KEY_H;
-      const bg = colorMap[k.r] || colorMap.a;
-      const fg = fgColorMap[k.r] || fgColorMap.a;
+      const id = keyId(ri, ci);
+      const ov = getOverride(id);
+      const bg = (ov && ov.bgColor) ? ov.bgColor : (colorMap[k.r] || colorMap.a);
+      const fg = (ov && ov.fgColor) ? ov.fgColor : (fgColorMap[k.r] || fgColorMap.a);
 
       svg += `<rect class="k" x="${x}" y="${y}" width="${w}" height="${h}" rx="${K_R}" fill="${bg}" />`;
-      if (k.l) {
-        const lines = k.l.split('\n');
-        svg += `<text x="${x + w / 2}" y="${y + h / 2 + 3}" text-anchor="middle" dominant-baseline="middle" font-size="7" fill="${fg}">${lines.map(l => escapeXml(l)).join('</text><text x="' + (x + w / 2) + '" y="' + (y + h / 2 + 3) + '" text-anchor="middle" dominant-baseline="middle" font-size="7" fill="' + fg + '">')}</text>`;
+      const effectiveLabel = getEffectiveText(id, k.l);
+      if (effectiveLabel) {
+        const lines = effectiveLabel.split('\n');
+        const fgStyle = ov && ov.glow ? `stroke="${fg}" stroke-width="0.5" fill="none"` : `fill="${fg}"`;
+        svg += `<text x="${x + w / 2}" y="${y + h / 2 + 3}" text-anchor="middle" dominant-baseline="middle" font-size="7" ${fgStyle}>${lines.map(l => escapeXml(l)).join('</text><text x="' + (x + w / 2) + '" y="' + (y + h / 2 + 3) + '" text-anchor="middle" dominant-baseline="middle" font-size="7" ' + fgStyle + '>')}</text>`;
+      }
+      if (ov && ov.imageData) {
+        svg += `<image x="${x + 2}" y="${y + 2}" width="${w - 4}" height="${h - 4}" preserveAspectRatio="xMidYMid meet" href="${escapeXml(ov.imageData)}" opacity="0.3"/>`;
       }
       cur = start + kw;
     });
@@ -64,17 +76,13 @@ export function generateSVG() {
   return svg;
 }
 
-function escapeXml(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
 export function downloadSVG() {
   const svg = generateSVG();
   const blob = new Blob([svg], { type: 'image/svg+xml' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `modkeys-${state.layout}-${state.colorway}-template.svg`;
+  a.download = `modkeys-${state.layout}-${state.customColors ? 'custom' : state.colorway}-template.svg`;
   a.click();
   URL.revokeObjectURL(url);
 }

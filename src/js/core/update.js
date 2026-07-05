@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { state } from './state.js';
+import { state, stateSlice } from './state.js';
 import { LAYOUTS } from '../data/layouts.js';
 import { COLORWAYS } from '../data/colorways.js';
 import { CASES, FINISHES, PLATES, SWITCHES, MATERIALS, PROFILES, GAP } from '../data/components.js';
@@ -10,6 +10,7 @@ import {
 } from './scene.js';
 import { rebuildBoard, buildKeys, refreshLegends, preloadEmoji } from './keyboard.js';
 import { setView } from './controls.js';
+import { pushState, undo as undoHistory, redo as redoHistory } from './history.js';
 
 let _syncUI = null;
 
@@ -18,6 +19,17 @@ export function registerSyncUI(fn) {
 }
 
 const modes = { wave: 0, static: 1, breathe: 2, off: 3 };
+
+export function effectiveColorway() {
+  if (state.customColors) {
+    return {
+      a: { bg: state.customColors.a.bg, fg: state.customColors.a.fg },
+      m: { bg: state.customColors.m.bg, fg: state.customColors.m.fg },
+      x: { bg: state.customColors.x.bg, fg: state.customColors.x.fg },
+    };
+  }
+  return COLORWAYS[state.colorway];
+}
 
 function applyLight() {
   uni.uMode.value = modes[state.light.mode] || 3;
@@ -30,16 +42,24 @@ function applyLight() {
   });
 }
 
+function applyColors(cw) {
+  matAlpha.color.copy(sRGB(cw.a.bg));
+  matMod.color.copy(sRGB(cw.m.bg));
+  matAccent.color.copy(sRGB(cw.x.bg));
+}
+
 function applyInstant(s) {
   if (s.brand !== undefined) state.brand = s.brand;
   if (s.colorway) {
-    const cw = COLORWAYS[s.colorway];
-    matAlpha.color.copy(sRGB(cw.a.bg));
-    matMod.color.copy(sRGB(cw.m.bg));
-    matAccent.color.copy(sRGB(cw.x.bg));
+    applyColors(COLORWAYS[s.colorway]);
     state.colorway = s.colorway;
+    state.customColors = null;
     refreshLegends();
     import('../ui/panels.js').then(m => m.renderPanel(state.section));
+  } else if (s.customColors) {
+    applyColors(s.customColors);
+    state.customColors = s.customColors;
+    refreshLegends();
   } else if (s.brand !== undefined) {
     refreshLegends();
   }
@@ -82,6 +102,10 @@ function applyInstant(s) {
     state.extras = Object.assign({}, state.extras, s.extras);
     knobGroup.visible = LAYOUTS[state.layout].knob && state.extras.knob;
   }
+  if (s.perKeyOverrides) {
+    state.perKeyOverrides = s.perKeyOverrides;
+    refreshLegends();
+  }
 }
 
 function popKeys() {
@@ -120,6 +144,13 @@ function apply3D(patch, animate) {
     tweenColor(matAlpha, cw.a.bg);
     tweenColor(matMod, cw.m.bg);
     tweenColor(matAccent, cw.x.bg);
+    state.customColors = null;
+    gsap.delayedCall(0.26, refreshLegends);
+  }
+  if (patch.customColors) {
+    tweenColor(matAlpha, patch.customColors.a.bg);
+    tweenColor(matMod, patch.customColors.m.bg);
+    tweenColor(matAccent, patch.customColors.x.bg);
     gsap.delayedCall(0.26, refreshLegends);
   }
   if (patch.caseColor) tweenColor(matCase, CASES[patch.caseColor].c);
@@ -149,13 +180,40 @@ function apply3D(patch, animate) {
     rebuildBoard();
     popKeys();
   }
+  if (patch.perKeyOverrides) {
+    state.perKeyOverrides = patch.perKeyOverrides;
+    refreshLegends();
+  }
 }
 
 export function setState(patch, opts) {
   opts = opts || {};
   if (patch.light) patch.light = Object.assign({}, state.light, patch.light);
   if (patch.extras) patch.extras = Object.assign({}, state.extras, patch.extras);
+  pushState(stateSlice());
   Object.assign(state, patch);
   apply3D(patch, opts.animate !== false);
   if (_syncUI) _syncUI(opts.skipPanel);
+}
+
+export function undo() {
+  const snap = undoHistory();
+  if (!snap) return false;
+  Object.assign(state, snap);
+  applyInstant(snap);
+  if (snap.layout) rebuildBoard();
+  if (snap.profile) buildKeys();
+  if (_syncUI) _syncUI();
+  return true;
+}
+
+export function redo() {
+  const snap = redoHistory();
+  if (!snap) return false;
+  Object.assign(state, snap);
+  applyInstant(snap);
+  if (snap.layout) rebuildBoard();
+  if (snap.profile) buildKeys();
+  if (_syncUI) _syncUI();
+  return true;
 }

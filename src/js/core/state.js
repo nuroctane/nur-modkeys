@@ -16,6 +16,9 @@ const state = {
   theme: 'light',
   section: 'keycaps',
   selectedPreset: 'claude',
+  selectedKey: null,
+  customColors: null,
+  perKeyOverrides: {},
 };
 
 export { state };
@@ -31,5 +34,7 @@ export function stateSlice() {
     material: state.material,
     light: state.light,
     extras: state.extras,
+    customColors: state.customColors,
+    perKeyOverrides: state.perKeyOverrides,
   }));
 }

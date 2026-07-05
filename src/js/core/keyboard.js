@@ -6,11 +6,17 @@ import { state } from './state.js';
 import {
   renderer, scene, camera, root, caseGroup, capsGroup, switchGroup, knobGroup, keyGlowGroup,
   capMats, matCase, matPlate, matSwBody, matStem, matKnob,
-  skirtMat, keyGlowMat, keyGlowGeo,
+  skirtMat, keyGlowMat, keyGlowGeo, createLegendGlowMat,
   CAP_Y, setPlateMesh, setBoardDims, sRGB, uni,
   aoPlane, glowPlane,
 } from './scene.js';
 import { BRAND_MARKS, MARKS, EMOJI, emojiUrl } from '../data/art.js';
+import {
+  getEffectiveText, getEffectiveFg, getEffectiveMark,
+  getEffectiveImage, getEffectiveFontSize, hasGlow, hasImageBehindText,
+  getOverride, keyId as perKeyId, getAllEntries,
+} from './perKey.js';
+import { composeLegend } from './imageLoader.js';
 
 export let plateMesh = null;
 let plateBaseY = 0.6;
@@ -89,43 +95,68 @@ function capGeo(wU, profId) {
 /* legend textures */
 const legendCache = new Map();
 const S = 2;
-function legendTex(label, wU, fg, mark) {
-  const key = label + '|' + wU + '|' + fg + (mark ? '|' + mark : '');
-  if (legendCache.has(key)) return legendCache.get(key);
+function legendTex(label, wU, fg, mark, opts) {
+  opts = opts || {};
+  const useLabel = (opts.customText !== undefined) ? opts.customText : label;
+  const useFg = (opts.customFg !== undefined) ? opts.customFg : fg;
+  const useText = useLabel || '';
+  const cacheKey = (useLabel || '') + '|' + wU + '|' + (useFg || 'nofg') + (mark ? '|' + mark : '') + (opts.imageData ? '|img' : '') + (opts.glow ? '|glow' : '');
+  if (!opts.glow && legendCache.has(cacheKey)) return legendCache.get(cacheKey);
   const W = Math.max(128, Math.round(128 * wU)) * S, H = 128 * S;
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
   const g = c.getContext('2d');
-  const em = mark && emojiImg[mark];
-  if (em && em.ready) {
-    const sz = Math.min(W, H) * 0.76;
-    g.drawImage(em.img, (W - sz) / 2, (H - sz) / 2, sz, sz);
-  } else if (mark && MARKS[mark]) {
-    MARKS[mark](g, W, H, fg);
-  } else {
-    g.fillStyle = fg;
-    g.textBaseline = 'top';
-    const lines = label.split('\n'), pad = 17 * S;
-    const F = '"Inter","Segoe UI",Arial,sans-serif';
-    if (lines.length === 2) {
-      g.font = '700 ' + 27 * S + 'px ' + F;
-      g.fillText(lines[0], pad, pad);
-      g.fillText(lines[1], pad, pad + 44 * S);
+  const pad = 17 * S;
+
+  if (opts.imageData) {
+    const img = new Image();
+    img.src = opts.imageData;
+    const iw = img.naturalWidth || W;
+    const ih = img.naturalHeight || H;
+    const scale = Math.min((W - pad * 2) / iw, (H - pad * 2) / ih);
+    const dw = iw * scale, dh = ih * scale;
+    g.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    if (opts.imageBehindText && useText) {
+      renderCanvasText(g, useText, useFg, opts.fontSize || 29, W, H, S, pad);
+    }
+  } else if (opts.glow) {
+    renderCanvasText(g, useText, '#ffffff', opts.fontSize || 29, W, H, S, pad);
+  } else if (useText) {
+    const em = mark && emojiImg[mark];
+    if (em && em.ready) {
+      const sz = Math.min(W, H) * 0.76;
+      g.drawImage(em.img, (W - sz) / 2, (H - sz) / 2, sz, sz);
+    } else if (mark && MARKS[mark]) {
+      MARKS[mark](g, W, H, useFg);
     } else {
-      let fs = 29 * S;
-      g.font = '700 ' + fs + 'px ' + F;
-      while (g.measureText(label).width > W - pad * 2 && fs > 15 * S) {
-        fs--;
-        g.font = '700 ' + fs + 'px ' + F;
-      }
-      g.fillText(label, pad, pad + 4 * S);
+      renderCanvasText(g, useText, useFg, opts.fontSize || 29, W, H, S, pad);
     }
   }
   const t = new THREE.CanvasTexture(c);
   t.anisotropy = renderer.capabilities.getMaxAnisotropy();
   t.colorSpace = THREE.SRGBColorSpace;
-  legendCache.set(key, t);
+  if (!opts.glow) legendCache.set(cacheKey, t);
   return t;
+}
+
+function renderCanvasText(g, text, fg, fs, W, H, S, pad) {
+  const F = '"Inter","Segoe UI",Arial,sans-serif';
+  g.fillStyle = fg || '#000000';
+  g.textBaseline = 'top';
+  const lines = text.split('\n');
+  if (lines.length === 2) {
+    g.font = '700 ' + 27 * S + 'px ' + F;
+    g.fillText(lines[0], pad, pad);
+    g.fillText(lines[1], pad, pad + 44 * S);
+  } else {
+    let fontSize = fs * S;
+    g.font = '700 ' + fontSize + 'px ' + F;
+    while (g.measureText(text).width > W - pad * 2 && fontSize > 15 * S) {
+      fontSize--;
+      g.font = '700 ' + fontSize + 'px ' + F;
+    }
+    g.fillText(text, pad, pad + 4 * S);
+  }
 }
 
 const emojiImg = {};
@@ -233,6 +264,80 @@ function makeSwitch(x, z) {
   return g;
 }
 
+function buildOneKey(keyDef, ri, ci, cx, cz, prof, cw, addToGroups) {
+  const mesh = new THREE.Mesh(capGeo(keyDef.w, state.profile), capMats[keyDef.r]);
+  mesh.userData.gk = keyDef.w + '|' + state.profile;
+  mesh.castShadow = mesh.receiveShadow = true;
+  mesh.position.set(cx, CAP_Y, cz);
+  mesh.rotation.x = prof.tilt[ri];
+  const id = perKeyId(ri, ci);
+  const effectiveLabel = getEffectiveText(id, keyDef.l);
+  const effectiveFg = getEffectiveFg(id, cw[keyDef.r].fg);
+  const effectiveMark = getEffectiveMark(id, markFor(keyDef.l));
+  const effectiveImage = getEffectiveImage(id);
+  const effectiveFs = getEffectiveFontSize(id, 29);
+  const glow = hasGlow(id);
+  const imgBehind = hasImageBehindText(id);
+  const customBg = (getOverride(id) && getOverride(id).bgColor) || null;
+
+  mesh.userData = Object.assign(mesh.userData, {
+    isCap: true, baseY: CAP_Y, row: ri, col: ci,
+    label: keyDef.l, w: keyDef.w, role: keyDef.r,
+    perKeyId: id,
+  });
+
+  if (effectiveLabel) {
+    const topW = (keyDef.w - GAP) * prof.taper * 0.92, topD = (1 - GAP) * prof.taper * 0.82;
+    const texOpts = {
+      customText: effectiveLabel,
+      customFg: effectiveFg,
+      imageData: effectiveImage,
+      glow,
+      imageBehindText: imgBehind,
+      fontSize: effectiveFs,
+    };
+    const leg = new THREE.Mesh(
+      new THREE.PlaneGeometry(topW, topD),
+      new THREE.MeshBasicMaterial({
+        map: legendTex(keyDef.l, keyDef.w, cw[keyDef.r].fg, effectiveMark, texOpts),
+        transparent: true,
+        depthWrite: false,
+      }),
+    );
+    leg.material.toneMapped = false;
+    leg.rotation.x = -Math.PI / 2;
+    leg.position.y = prof.h + 0.052;
+    leg.renderOrder = 2;
+    mesh.add(leg);
+    mesh.userData.legend = leg;
+
+    if (glow) {
+      const glowMat = createLegendGlowMat();
+      const maskTex = legendTex(keyDef.l, keyDef.w, '#ffffff', effectiveMark, texOpts);
+      glowMat.uniforms.uMask.value = maskTex;
+      const glowLeg = new THREE.Mesh(new THREE.PlaneGeometry(topW, topD), glowMat);
+      glowLeg.rotation.x = -Math.PI / 2;
+      glowLeg.position.y = prof.h + 0.056;
+      glowLeg.renderOrder = 3;
+      mesh.add(glowLeg);
+      mesh.userData.glowLegend = glowLeg;
+    }
+  }
+
+  if (addToGroups !== false) {
+    capsGroup.add(mesh);
+    switchGroup.add(makeSwitch(cx, cz));
+    const glow = new THREE.Mesh(keyGlowGeo, keyGlowMat);
+    glow.rotation.x = -Math.PI / 2;
+    glow.position.set(cx, 1.02, cz);
+    glow.scale.set(keyDef.w * 1.16, 1.16, 1);
+    glow.renderOrder = 1;
+    glow.userData.keepGeo = true;
+    keyGlowGroup.add(glow);
+  }
+  return mesh;
+}
+
 export function buildKeys() {
   disposeGroup(capsGroup);
   disposeGroup(switchGroup);
@@ -246,42 +351,58 @@ export function buildKeys() {
       const start = keyDef.x !== undefined ? keyDef.x : cur;
       const cx = start + keyDef.w / 2 - center, cz = ri - 2;
       cur = start + keyDef.w;
-      const mesh = new THREE.Mesh(capGeo(keyDef.w, state.profile), capMats[keyDef.r]);
-      mesh.userData.gk = keyDef.w + '|' + state.profile;
-      mesh.castShadow = mesh.receiveShadow = true;
-      mesh.position.set(cx, CAP_Y, cz);
-      mesh.rotation.x = prof.tilt[ri];
-      mesh.userData = Object.assign(mesh.userData, {
-        isCap: true, baseY: CAP_Y, row: ri, col: ci, label: keyDef.l, w: keyDef.w, role: keyDef.r,
-      });
-      if (keyDef.l) {
-        const topW = (keyDef.w - GAP) * prof.taper * 0.92, topD = (1 - GAP) * prof.taper * 0.82;
-        const leg = new THREE.Mesh(
-          new THREE.PlaneGeometry(topW, topD),
-          new THREE.MeshBasicMaterial({
-            map: legendTex(keyDef.l, keyDef.w, cw[keyDef.r].fg, markFor(keyDef.l)),
-            transparent: true,
-            depthWrite: false,
-          }),
-        );
-        leg.material.toneMapped = false;
-        leg.rotation.x = -Math.PI / 2;
-        leg.position.y = prof.h + 0.052;
-        leg.renderOrder = 2;
-        mesh.add(leg);
-        mesh.userData.legend = leg;
-      }
-      capsGroup.add(mesh);
-      switchGroup.add(makeSwitch(cx, cz));
-      const glow = new THREE.Mesh(keyGlowGeo, keyGlowMat);
-      glow.rotation.x = -Math.PI / 2;
-      glow.position.set(cx, 1.02, cz);
-      glow.scale.set(keyDef.w * 1.16, 1.16, 1);
-      glow.renderOrder = 1;
-      glow.userData.keepGeo = true;
-      keyGlowGroup.add(glow);
+      buildOneKey(keyDef, ri, ci, cx, cz, prof, cw);
     });
   });
+}
+
+export function rebuildKey(ri, ci) {
+  const L = LAYOUTS[state.layout], rows = L.rows(), center = L.total / 2;
+  const prof = PROFILES[state.profile];
+  const cw = COLORWAYS[state.colorway];
+  if (ri >= rows.length) return;
+  const row = rows[ri];
+  if (ci >= row.length) return;
+  const keyDef = row[ci];
+  let cur = 0;
+  for (let i = 0; i < ci; i++) {
+    const k = row[i];
+    cur = (k.x !== undefined ? k.x : cur) + (k.w || 1);
+  }
+  const start = keyDef.x !== undefined ? keyDef.x : cur;
+  const cx = start + keyDef.w / 2 - center, cz = ri - 2;
+
+  /* remove existing */
+  const id = perKeyId(ri, ci);
+  for (let i = capsGroup.children.length - 1; i >= 0; i--) {
+    const c = capsGroup.children[i];
+    if (c.userData.perKeyId === id) {
+      capsGroup.remove(c);
+      c.traverse((n) => {
+        if (n.geometry && n.userData.gk !== keyDef.w + '|' + state.profile) n.geometry.dispose();
+      });
+      break;
+    }
+  }
+
+  const mesh = buildOneKey(keyDef, ri, ci, cx, cz, prof, cw, false);
+  capsGroup.add(mesh);
+
+  /* rebuild glow plane */
+  for (let i = keyGlowGroup.children.length - 1; i >= 0; i--) {
+    const g = keyGlowGroup.children[i];
+    if (Math.abs(g.position.x - cx) < 0.01 && Math.abs(g.position.z - cz) < 0.01) {
+      keyGlowGroup.remove(g);
+      break;
+    }
+  }
+  const glow = new THREE.Mesh(keyGlowGeo, keyGlowMat);
+  glow.rotation.x = -Math.PI / 2;
+  glow.position.set(cx, 1.02, cz);
+  glow.scale.set(keyDef.w * 1.16, 1.16, 1);
+  glow.renderOrder = 1;
+  glow.userData.keepGeo = true;
+  keyGlowGroup.add(glow);
 }
 
 export function rebuildBoard() {
@@ -292,9 +413,46 @@ export function rebuildBoard() {
 export function refreshLegends() {
   const cw = COLORWAYS[state.colorway];
   capsGroup.children.forEach((c) => {
-    if (c.userData.legend)
-      c.userData.legend.material.map = legendTex(
-        c.userData.label, c.userData.w, cw[c.userData.role].fg, markFor(c.userData.label),
+    if (!c.userData.legend) return;
+    const id = c.userData.perKeyId;
+    const effectiveLabel = getEffectiveText(id, c.userData.label);
+    const effectiveFg = getEffectiveFg(id, cw[c.userData.role].fg);
+    const effectiveMark = getEffectiveMark(id, markFor(c.userData.label));
+    const effectiveImage = getEffectiveImage(id);
+    const effectiveFs = getEffectiveFontSize(id, 29);
+    const glow = hasGlow(id);
+    const imgBehind = hasImageBehindText(id);
+    const texOpts = {
+      customText: effectiveLabel,
+      customFg: effectiveFg,
+      imageData: effectiveImage,
+      glow,
+      imageBehindText: imgBehind,
+      fontSize: effectiveFs,
+    };
+    c.userData.legend.material.map = legendTex(
+      c.userData.label, c.userData.w, cw[c.userData.role].fg, effectiveMark, texOpts,
+    );
+    c.userData.legend.material.needsUpdate = true;
+    if (glow && !c.userData.glowLegend) {
+      const topW = (c.userData.w - GAP) * PROFILES[state.profile].taper * 0.92;
+      const topD = (1 - GAP) * PROFILES[state.profile].taper * 0.82;
+      const glowMat = createLegendGlowMat();
+      const maskTex = legendTex(c.userData.label, c.userData.w, '#ffffff', effectiveMark, texOpts);
+      glowMat.uniforms.uMask.value = maskTex;
+      const glowLeg = new THREE.Mesh(new THREE.PlaneGeometry(topW, topD), glowMat);
+      glowLeg.rotation.x = -Math.PI / 2;
+      glowLeg.position.y = PROFILES[state.profile].h + 0.056;
+      glowLeg.renderOrder = 3;
+      c.add(glowLeg);
+      c.userData.glowLegend = glowLeg;
+    } else if (!glow && c.userData.glowLegend) {
+      c.remove(c.userData.glowLegend);
+      c.userData.glowLegend = null;
+    } else if (glow && c.userData.glowLegend) {
+      c.userData.glowLegend.material.uniforms.uMask.value = legendTex(
+        c.userData.label, c.userData.w, '#ffffff', effectiveMark, texOpts,
       );
+    }
   });
 }

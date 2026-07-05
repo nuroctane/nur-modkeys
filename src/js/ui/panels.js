@@ -2,7 +2,11 @@ import { state } from '../core/state.js';
 import { LAYOUTS } from '../data/layouts.js';
 import { COLORWAYS, PANEL_SWATCHES } from '../data/colorways.js';
 import { CASES, FINISHES, PLATES, SWITCHES, MATERIALS, EXTRAS, PROFILES, LIGHT_COLORS } from '../data/components.js';
-import { setState } from '../core/update.js';
+import { setState, effectiveColorway } from '../core/update.js';
+import { setOverride, clearOverride, getOverride } from '../core/perKey.js';
+import { loadImage } from '../core/imageLoader.js';
+import { MARKS } from '../data/art.js';
+import { rebuildKey } from '../core/keyboard.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -14,7 +18,7 @@ export function lightDotStyle() {
 }
 
 export function syncUI(skipPanel) {
-  const cw = COLORWAYS[state.colorway];
+  const cw = effectiveColorway();
   $('dotKeycaps').style.background = cw.a.bg;
   $('dotSwitches').style.background = SWITCHES[state.sw].dot;
   $('dotCase').style.background = CASES[state.caseColor].c;
@@ -43,6 +47,10 @@ function swatchRow(items, cur, act) {
     '</div>';
 }
 
+function hexRow(label, id, val) {
+  return `<div class="hexRow"><span class="hexLabel">${label}</span><input type="color" class="hexInput" id="${id}" value="${val || '#000000'}"></div>`;
+}
+
 const PROFILE_ICONS = {
   cherry: 'M6 19 L10 9 Q20 6.2 30 9 L34 19 Z',
   oem: 'M6 19 L9 7 Q20 4.6 31 7 L34 19 Z',
@@ -59,7 +67,8 @@ const PANELS = {
 <div class="grp"><div class="glabel">${LAYOUTS[state.layout].name}</div><div class="hint">${LAYOUTS[state.layout].tag}</div></div>`,
 
   keycaps: () => {
-    const cw = COLORWAYS[state.colorway];
+    const cw = effectiveColorway();
+    const cc = state.customColors;
     return `
 <div class="preview">${[
   { w: 1.1, h: 1.1, x: 38, y: 24, c: cw.m.bg, f: cw.m.fg, l: 'TAB' },
@@ -76,9 +85,18 @@ const PANELS = {
   )}</div>
 <div class="grp"><div class="glabel">COLORWAY</div>${swatchRow(
     PANEL_SWATCHES.map(id => [id, COLORWAYS[id].a.bg, COLORWAYS[id].m.bg, COLORWAYS[id].name]),
-    state.colorway, 'colorway',
+    (state.customColors ? '__custom__' : state.colorway), 'colorway',
   )}</div>
-<div class="grp" style="margin-top:4px"><button class="libBtn" id="libOpen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20l4-4m0 0l4 4m-4-4V4" stroke-linecap="round"/></svg>View Keycap Library</button></div>`;
+<div class="grp" style="margin-top:4px"><button class="libBtn" id="libOpen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20l4-4m0 0l4 4m-4-4V4" stroke-linecap="round"/></svg>View Keycap Library</button></div>
+<div class="grp"><div class="glabel">CUSTOM COLORS</div>
+<div class="hexGrid">
+  <div class="hexCol"><div class="hexTitle">Alpha</div>${hexRow('BG', 'hexAbg', (cc && cc.a.bg) || cw.a.bg)}${hexRow('FG', 'hexAfg', (cc && cc.a.fg) || cw.a.fg)}</div>
+  <div class="hexCol"><div class="hexTitle">Mod</div>${hexRow('BG', 'hexMbg', (cc && cc.m.bg) || cw.m.bg)}${hexRow('FG', 'hexMfg', (cc && cc.m.fg) || cw.m.fg)}</div>
+  <div class="hexCol"><div class="hexTitle">Accent</div>${hexRow('BG', 'hexXbg', (cc && cc.x.bg) || cw.x.bg)}${hexRow('FG', 'hexXfg', (cc && cc.x.fg) || cw.x.fg)}</div>
+</div>
+<button class="libBtn" id="applyCustomColors" style="margin-top:6px">Apply Custom Colors</button>
+<button class="libBtn" id="clearCustomColors" style="margin-top:4px">Reset to Colorway</button>
+</div>`;
   },
 
   switches: () => `
@@ -86,7 +104,7 @@ const PANELS = {
     Object.entries(SWITCHES).map(([id, s]) => [id, s.name]),
     state.sw, 'sw',
   )}
-<div class="hint" style="margin-top:10px">${SWITCHES[state.sw].type} · ${SWITCHES[state.sw].force} · ${SWITCHES[state.sw].sound} sound · Click any key on the board to hear it.</div>`,
+<div class="hint" style="margin-top:10px">${SWITCHES[state.sw].type} · ${SWITCHES[state.sw].force} · ${SWITCHES[state.sw].sound} sound · Double-click any key on the board to customize it.</div>`,
 
   case: () => `
 <div class="glabel">COLOR</div>${swatchRow(
@@ -135,7 +153,6 @@ export function renderPanel(section) {
   );
   $('panelTitle').textContent = section.toUpperCase();
   $('panelBody').innerHTML = PANELS[section] ? PANELS[section]() : '';
-  /* brightness slider listener */
   const sl = document.querySelector('#brightSlider');
   if (sl) {
     sl.oninput = () => {
@@ -144,20 +161,137 @@ export function renderPanel(section) {
   }
 }
 
-/* panel event delegation */
+/* key editor popover */
+let _currentEditId = null;
+
+export function showKeyEditor(keyData) {
+  _currentEditId = keyData.perKeyId;
+  const ov = getOverride(_currentEditId) || {};
+  const html = `
+<div class="keHead">
+  <span>Key ${_currentEditId}</span>
+  <button id="keClose" class="keBtn">✕</button>
+</div>
+<div class="keBody">
+  <div class="keRow"><label>Text</label><input type="text" id="keText" value="${(ov.customText !== undefined ? ov.customText : (keyData.label || '')).replace(/"/g, '&quot;')}" class="keInput"></div>
+  <div class="keRow"><label>Font size</label><input type="range" id="keFs" min="12" max="48" value="${ov.fontSize || 29}" class="keSlider"></div>
+  <div class="keRow"><label>FG color</label><input type="color" id="keFg" value="${ov.fgColor || '#000000'}" class="keColor"></div>
+  <div class="keRow"><label>BG color</label><input type="color" id="keBg" value="${ov.bgColor || '#ffffff'}" class="keColor"></div>
+  <div class="keRow"><label>Glow text</label><label class="keToggle ${ov.glow ? 'on' : ''}" id="keGlow"><span></span></label></div>
+  <div class="keRow"><label>Image behind text</label><label class="keToggle ${ov.imageBehindText ? 'on' : ''}" id="keImgBehind"><span></span></label></div>
+  <div class="keRow"><label>Image</label><input type="file" id="keImage" accept="image/png,image/jpeg,image/svg+xml" class="keFile"></div>
+  ${ov.imageData ? `<div class="keRow"><label></label><img src="${ov.imageData}" class="kePreview"><button id="keRemoveImg" class="keBtn">Remove</button></div>` : ''}
+  <div class="keRow" style="margin-top:12px"><button id="keReset" class="keBtn">Reset to default</button></div>
+</div>`;
+
+  const pop = $('keyEditor');
+  if (!pop) return;
+  pop.innerHTML = html;
+  pop.classList.add('open');
+  $('panelBody').classList.add('keOpen');
+}
+
+export function hideKeyEditor() {
+  const pop = $('keyEditor');
+  if (pop) pop.classList.remove('open');
+  $('panelBody').classList.remove('keOpen');
+  _currentEditId = null;
+  state.selectedKey = null;
+}
+
+/* panel + key editor event delegation */
 $('panelBody').addEventListener('click', (ev) => {
   const chip = ev.target.closest('[data-act]');
-  if (!chip) return;
-  const act = chip.dataset.act, v = chip.dataset.v;
-  if (act === 'layout') { setState({ layout: v, selectedPreset: null }); return; }
-  if (act === 'profile') { setState({ profile: v }); return; }
-  if (act === 'material') { setState({ material: v }); return; }
-  if (act === 'colorway') { setState({ colorway: v, selectedPreset: null }); return; }
-  if (act === 'sw') { setState({ sw: v, selectedPreset: null }); return; }
-  if (act === 'caseColor') { setState({ caseColor: v }); return; }
-  if (act === 'finish') { setState({ finish: v }); return; }
-  if (act === 'plate') { setState({ plate: v }); return; }
-  if (act === 'lightMode') { setState({ light: { mode: v } }); return; }
-  if (act === 'lightColor') { setState({ light: { color: v } }); return; }
-  if (act === 'extras') { const e = {}; e[v] = !state.extras[v]; setState({ extras: e }); return; }
+  if (chip) {
+    const act = chip.dataset.act, v = chip.dataset.v;
+    if (act === 'layout') { setState({ layout: v, selectedPreset: null }); return; }
+    if (act === 'profile') { setState({ profile: v }); return; }
+    if (act === 'material') { setState({ material: v }); return; }
+    if (act === 'colorway') { setState({ colorway: v, selectedPreset: null, customColors: null }); return; }
+    if (act === 'sw') { setState({ sw: v, selectedPreset: null }); return; }
+    if (act === 'caseColor') { setState({ caseColor: v }); return; }
+    if (act === 'finish') { setState({ finish: v }); return; }
+    if (act === 'plate') { setState({ plate: v }); return; }
+    if (act === 'lightMode') { setState({ light: { mode: v } }); return; }
+    if (act === 'lightColor') { setState({ light: { color: v } }); return; }
+    if (act === 'extras') { const e = {}; e[v] = !state.extras[v]; setState({ extras: e }); return; }
+    return;
+  }
+
+  if (ev.target.id === 'applyCustomColors') {
+    const cc = {
+      a: { bg: $('hexAbg').value, fg: $('hexAfg').value },
+      m: { bg: $('hexMbg').value, fg: $('hexMfg').value },
+      x: { bg: $('hexXbg').value, fg: $('hexXfg').value },
+    };
+    setState({ customColors: cc, colorway: '__custom__' });
+    return;
+  }
+  if (ev.target.id === 'clearCustomColors') {
+    setState({ customColors: null, colorway: state.colorway || 'claude' });
+    return;
+  }
+  if (ev.target.id === 'keReset' && _currentEditId) {
+    clearOverride(_currentEditId);
+    rebuildKey(..._currentEditId.split('-').map(Number));
+    hideKeyEditor();
+    return;
+  }
+  if (ev.target.id === 'keRemoveImg' && _currentEditId) {
+    const ov = getOverride(_currentEditId) || {};
+    delete ov.imageData;
+    setOverride(_currentEditId, { imageData: null });
+    rebuildKey(..._currentEditId.split('-').map(Number));
+    showKeyEditor({ perKeyId: _currentEditId, label: state.layout ? '' : '' });
+    return;
+  }
+});
+
+/* key editor input events */
+$('panelBody').addEventListener('input', (ev) => {
+  if (!_currentEditId) return;
+  const id = ev.target.id;
+  if (id === 'keText' || id === 'keFs' || id === 'keFg' || id === 'keBg') {
+    const patch = {};
+    if (id === 'keText') patch.customText = ev.target.value || '';
+    if (id === 'keFs') patch.fontSize = parseInt(ev.target.value);
+    if (id === 'keFg') patch.fgColor = ev.target.value;
+    if (id === 'keBg') patch.bgColor = ev.target.value;
+    setOverride(_currentEditId, patch);
+    rebuildKey(..._currentEditId.split('-').map(Number));
+  }
+});
+
+$('panelBody').addEventListener('change', async (ev) => {
+  if (!_currentEditId) return;
+  if (ev.target.id === 'keImage') {
+    const file = ev.target.files[0];
+    if (!file) return;
+    const dataUrl = await loadImage(file);
+    setOverride(_currentEditId, { imageData: dataUrl });
+    rebuildKey(..._currentEditId.split('-').map(Number));
+    showKeyEditor({ perKeyId: _currentEditId, label: '' });
+  }
+});
+
+$('panelBody').addEventListener('click', (ev) => {
+  if (ev.target.id === 'keGlow') {
+    if (!_currentEditId) return;
+    const ov = getOverride(_currentEditId) || {};
+    setOverride(_currentEditId, { glow: !ov.glow });
+    rebuildKey(..._currentEditId.split('-').map(Number));
+    const el = $('keGlow');
+    if (el) el.classList.toggle('on');
+  }
+  if (ev.target.id === 'keImgBehind') {
+    if (!_currentEditId) return;
+    const ov = getOverride(_currentEditId) || {};
+    setOverride(_currentEditId, { imageBehindText: !ov.imageBehindText });
+    rebuildKey(..._currentEditId.split('-').map(Number));
+    const el = $('keImgBehind');
+    if (el) el.classList.toggle('on');
+  }
+  if (ev.target.id === 'keClose') {
+    hideKeyEditor();
+  }
 });

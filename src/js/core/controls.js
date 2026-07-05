@@ -5,6 +5,9 @@ import { state } from './state.js';
 import { SWITCHES } from '../data/components.js';
 import { playSwitch } from '../ui/sound.js';
 
+let onKeyEdit = null;
+export function onKeyEditClick(fn) { onKeyEdit = fn; }
+
 const canvas = document.getElementById('gl');
 const stage = document.getElementById('stage');
 
@@ -184,6 +187,7 @@ canvas.addEventListener('pointermove', (ev) => {
   }
 });
 
+let lastClickKey = null, lastClickTime = 0;
 function endPointer(ev) {
   pointers.delete(ev.pointerId);
   stage.classList.remove('grabbing');
@@ -191,6 +195,16 @@ function endPointer(ev) {
   if (dragMode === 'orbit' && moved < 5) {
     const hit = capOf(pick(capsGroup.children, ev));
     if (hit && !state.exploded) {
+      const now = Date.now();
+      if (hit === lastClickKey && now - lastClickTime < 350) {
+        state.selectedKey = hit.userData.perKeyId;
+        if (onKeyEdit) onKeyEdit(hit.userData);
+        lastClickKey = null;
+        lastClickTime = 0;
+        return;
+      }
+      lastClickKey = hit;
+      lastClickTime = now;
       playSwitch(SWITCHES[state.sw].sound);
       const gsap = window.gsap;
       gsap.timeline()

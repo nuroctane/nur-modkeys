@@ -158,6 +158,24 @@
                     <path d="M21 3v5h-5" stroke-linejoin="round" />
                   </svg>
                 </button>
+                <span class="toolSep"></span>
+                <button id="toolUndo" title="Undo (Ctrl+Z)">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                    <path d="M3 10l5-5v3h7a6 6 0 010 12H8v-2" stroke-linejoin="round" />
+                  </svg>
+                </button>
+                <button id="toolRedo" title="Redo (Ctrl+Y)">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                    <path d="M21 10l-5-5v3H9a6 6 0 000 12h7v-2" stroke-linejoin="round" />
+                  </svg>
+                </button>
+                <span class="toolSep"></span>
+                <button id="toolShare" title="Copy share link">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                    <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+                    <path d="M8.6 13.5l6.8 3.7M15.4 6.8l-6.8 3.7" />
+                  </svg>
+                </button>
               </div>
             </div>
           </div>
@@ -182,6 +200,9 @@
     </div>
 
     <div class="toast" id="toast"></div>
+
+    <!-- key editor popover -->
+    <div class="kePop" id="keyEditor"></div>
 
     <!-- modal -->
     <div class="modalWrap" id="modal">

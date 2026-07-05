@@ -233,6 +233,29 @@ void main(){
 });
 keyGlowMat.toneMapped = false;
 
+/* per-key legend glow shader — renders glow color masked by legend text shape */
+export function createLegendGlowMat() {
+  const mat = new THREE.ShaderMaterial({
+    uniforms: Object.assign({}, uni, { uMask: { value: null } }),
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    vertexShader: 'varying vec2 vUv;varying vec3 vW;void main(){vUv=uv;vW=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+    fragmentShader: HSL + `
+uniform float uTime,uBright;uniform int uMode;uniform vec3 uColor;uniform sampler2D uMask;varying vec2 vUv;varying vec3 vW;
+void main(){
+  float pulse = uMode==2 ? (0.3+0.7*(0.5+0.5*sin(uTime*2.2))) : 1.0;
+  vec4 m = texture2D(uMask, vUv);
+  float mask = m.r;
+  float a = mask * uBright * pulse * 2.0;
+  vec3 col = uMode==0 ? h2r(fract(vW.x*0.14+uTime*0.1)) : uColor;
+  gl_FragColor = vec4(col*a, a);
+}`,
+  });
+  mat.toneMapped = false;
+  return mat;
+}
+
 /* scene groups */
 export const caseGroup = new THREE.Group();
 export const capsGroup = new THREE.Group();

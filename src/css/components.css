@@ -80,6 +80,11 @@
 .toolbar button .spin {
   transition: transform 0.8s cubic-bezier(0.5, 0.05, 0.2, 1);
 }
+.toolSep {
+  width: 1px;
+  background: var(--line);
+  margin: 4px 2px;
+}
 
 /* ---------- featured ---------- */
 .featured {
@@ -690,4 +695,173 @@
   100% {
     transform: translateX(380%);
   }
+}
+
+/* custom color picker hex grid */
+.hexGrid {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.hexCol {
+  flex: 1;
+  min-width: 0;
+}
+.hexTitle {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--ink2);
+  margin-bottom: 4px;
+  text-align: center;
+}
+.hexRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 3px;
+}
+.hexLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink2);
+  width: 20px;
+}
+.hexInput {
+  width: 100%;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--card);
+  cursor: pointer;
+}
+.hexInput::-webkit-color-swatch-wrapper { padding: 2px; }
+.hexInput::-webkit-color-swatch { border: none; border-radius: 2px; }
+
+/* key editor popover */
+.kePop {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px var(--shadowC);
+  width: 380px;
+  max-height: 70vh;
+  overflow-y: auto;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.22,1,0.36,1);
+}
+.kePop.open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+.keHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.keBody {
+  padding: 0 16px 16px;
+}
+.keRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.keRow label:first-child {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink2);
+  width: 90px;
+  flex-shrink: 0;
+}
+.keInput {
+  flex: 1;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+}
+.keInput:focus {
+  border-color: var(--chipA);
+}
+.keSlider {
+  flex: 1;
+  accent-color: var(--chipA);
+}
+.keColor {
+  width: 36px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--card);
+  cursor: pointer;
+}
+.keColor::-webkit-color-swatch-wrapper { padding: 2px; }
+.keColor::-webkit-color-swatch { border: none; border-radius: 2px; }
+.keToggle {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  background: var(--card2);
+  border-radius: 11px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.keToggle.on {
+  background: var(--chipA);
+}
+.keToggle span {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: var(--ink);
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+.keToggle.on span {
+  transform: translateX(18px);
+}
+.keFile {
+  flex: 1;
+  font-size: 11px;
+  color: var(--ink2);
+}
+.kePreview {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+}
+.keBtn {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+.keBtn:hover {
+  background: var(--card2);
 }
