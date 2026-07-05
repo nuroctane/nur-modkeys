@@ -1,0 +1,278 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+}
+body {
+  font-family:
+    "Inter",
+    "SF Pro Display",
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    Arial,
+    sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  transition:
+    background 0.35s ease,
+    color 0.35s ease;
+}
+button {
+  font-family: inherit;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+}
+svg {
+  display: block;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line2);
+  border-radius: 8px;
+}
+
+/* ---------- app frame ---------- */
+.app {
+  display: grid;
+  grid-template-columns: 264px 1fr;
+  height: 100vh;
+  min-width: 1180px;
+}
+
+/* ---------- sidebar ---------- */
+.side {
+  background: var(--side);
+  color: var(--sideTx);
+  display: flex;
+  flex-direction: column;
+  padding: 0 20px 22px;
+  position: relative;
+  z-index: 5;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  height: 72px;
+  flex: 0 0 auto;
+}
+.logo svg {
+  color: var(--sideTx);
+}
+.logo b {
+  font-size: 16.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+.sideLabel {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--sideTx2);
+  margin: 26px 6px 10px;
+}
+.snav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.snav button {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  height: 52px;
+  padding: 0 12px;
+  border-radius: 11px;
+  color: var(--sideTx);
+  font-size: 14.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  transition: background 0.18s ease;
+  text-align: left;
+  width: 100%;
+}
+.snav button:hover {
+  background: rgba(255, 255, 255, 0.055);
+}
+.snav button.on {
+  background: rgba(255, 255, 255, 0.09);
+}
+.snav .ic {
+  width: 20px;
+  height: 20px;
+  color: #a9a9b0;
+  flex: 0 0 auto;
+}
+.snav button.on .ic {
+  color: #fff;
+}
+.snav .meta {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--sideTx2);
+  font-weight: 600;
+}
+.dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  margin-left: auto;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+.sideBottom {
+  margin-top: auto;
+}
+.saveRow {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  height: 46px;
+  padding: 0 6px;
+  margin-top: 8px;
+  color: #b9b9c0;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 10px;
+  width: 100%;
+  transition: color 0.18s;
+}
+.saveRow:hover {
+  color: #fff;
+}
+
+/* ---------- main / topbar ---------- */
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.topbar {
+  height: 72px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  padding: 0 28px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  transition:
+    background 0.35s,
+    border-color 0.35s;
+}
+.tnav {
+  display: flex;
+  gap: 34px;
+  margin: 0 auto;
+  height: 100%;
+}
+.tnav button {
+  position: relative;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink2);
+  height: 100%;
+  transition: color 0.18s;
+}
+.tnav button:hover {
+  color: var(--ink);
+}
+.tnav button.on {
+  color: var(--ink);
+}
+.tnav button.on::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 16px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ink);
+}
+.topIcons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+.iconBtn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  position: relative;
+  transition: background 0.18s;
+}
+.iconBtn:hover {
+  background: var(--card);
+}
+.avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  background: transparent;
+}
+
+/* ---------- content grid ---------- */
+.content {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 314px;
+  grid-template-rows: 1fr auto;
+  gap: 0 26px;
+  padding: 0 28px 18px;
+}
+.stageCol {
+  grid-row: 1;
+  grid-column: 1;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+.stage {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+}
+.stage.grabbing {
+  cursor: grabbing;
+}
+.stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    58% 52% at 50% 44%,
+    var(--stageGlow),
+    transparent 72%
+  );
+  pointer-events: none;
+  transition: background 0.35s;
+}
+#gl {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}

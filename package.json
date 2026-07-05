@@ -1,6 +1,6 @@
 {
   "name": "modkeys",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,11 @@
     "build": "vite build",
     "preview": "vite preview"
   },
+  "dependencies": {
+    "three": "^0.170.0",
+    "gsap": "^3.12.5"
+  },
   "devDependencies": {
-    "vite": "^8.1.1"
+    "vite": "^6.3.1"
   }
 }

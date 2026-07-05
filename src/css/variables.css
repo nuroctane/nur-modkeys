@@ -1,0 +1,36 @@
+:root {
+  --bg: #e9e8e6;
+  --panel: #ffffff;
+  --ink: #17171a;
+  --ink2: #87878d;
+  --ink3: #b4b4b8;
+  --line: #e6e5e2;
+  --line2: #dddcd8;
+  --card: #f4f3f1;
+  --card2: #eceae7;
+  --chipA: #141416;
+  --chipAtx: #ffffff;
+  --side: #0c0c0e;
+  --sideTx: #e9e9ec;
+  --sideTx2: #78787e;
+  --stageGlow: #f4f3f0;
+  --shadowC: rgba(20, 20, 24, 0.1);
+}
+[data-theme="dark"] {
+  --bg: #131315;
+  --panel: #1c1c1f;
+  --ink: #f0f0f2;
+  --ink2: #93939b;
+  --ink3: #5a5a60;
+  --line: #2a2a2e;
+  --line2: #333338;
+  --card: #232327;
+  --card2: #2a2a2f;
+  --chipA: #f0f0f2;
+  --chipAtx: #141416;
+  --side: #0a0a0c;
+  --sideTx: #ececef;
+  --sideTx2: #6f6f76;
+  --stageGlow: #1f1f23;
+  --shadowC: rgba(0, 0, 0, 0.35);
+}
