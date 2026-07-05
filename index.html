@@ -735,23 +735,42 @@
       .preview {
         background: var(--card);
         border-radius: 15px;
-        height: 198px;
+        height: 214px;
         position: relative;
         overflow: hidden;
         margin-bottom: 16px;
       }
       .kc {
         position: absolute;
-        border-radius: 9px;
-        font-size: 10px;
-        font-weight: 700;
-        padding: 7px 0 0 8px;
-        letter-spacing: 0.02em;
+        border-radius: 12px;
+        background: var(--bg);
         box-shadow:
-          inset 0 2px 0 rgba(255, 255, 255, 0.32),
-          inset 0 -9px 0 rgba(0, 0, 0, 0.16),
-          0 12px 22px rgba(0, 0, 0, 0.2);
-        transform: rotate(-15deg);
+          0 9px 16px rgba(0, 0, 0, 0.15),
+          0 3px 6px rgba(0, 0, 0, 0.1),
+          inset 0 -2px 3px rgba(0, 0, 0, 0.3);
+      }
+      .kctop {
+        position: absolute;
+        inset: 4px 5px 11px 5px;
+        border-radius: 8px;
+        background: var(--bg);
+        filter: brightness(1.07);
+        color: var(--fg);
+        font-size: 12.5px;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        display: flex;
+        align-items: flex-start;
+        padding: 9px 0 0 10px;
+        box-shadow:
+          inset 0 2px 1px rgba(255, 255, 255, 0.45),
+          inset 0 -1px 1px rgba(0, 0, 0, 0.08),
+          0 1px 2px rgba(0, 0, 0, 0.14);
+      }
+      .kctop.mid {
+        align-items: center;
+        justify-content: center;
+        padding: 0;
       }
       .libBtn {
         display: flex;
@@ -1678,6 +1697,14 @@
             sw: ["#eceef4", "#4184f3"],
             tag: "Spark · Blue · Indigo",
           },
+          sakura: {
+            name: "Sakura",
+            a: { bg: "#f2ebf1", fg: "#463a50" },
+            m: { bg: "#2e2540", fg: "#ece2f5" },
+            x: { bg: "#e86aa0", fg: "#fff2f8" },
+            sw: ["#f2ebf1", "#e86aa0"],
+            tag: "Sakura · Neon · Ink",
+          },
           botanical: {
             name: "GMK Botanical",
             a: { bg: "#e7e2d4", fg: "#35342f" },
@@ -1743,7 +1770,7 @@
             tag: "Rose · Ash · Cocoa",
           },
         };
-        const PANEL_SWATCHES = ["claude", "gemini", "botanical", "deepsea"];
+        const PANEL_SWATCHES = ["claude", "gemini", "sakura", "botanical"];
 
         const CASES = {
           porcelain: { name: "Porcelain", c: "#e7dfce" },
@@ -1766,19 +1793,36 @@
             c: "#cfd2d6",
             d: 0,
             tag: "Balanced, crisp",
+            metal: 0.9,
+            rough: 0.44,
+            env: 0.8,
           },
-          brass: { name: "Brass", c: "#c9a86a", d: 18, tag: "Deep, resonant" },
+          brass: {
+            name: "Brass",
+            c: "#a5813a",
+            d: 18,
+            tag: "Deep, resonant",
+            metal: 0.85,
+            rough: 0.52,
+            env: 0.5,
+          },
           poly: {
             name: "Polycarbonate",
-            c: "#e2e6ea",
+            c: "#e6ebf0",
             d: 6,
             tag: "Soft, flexible",
+            metal: 0.0,
+            rough: 0.34,
+            env: 0.35,
           },
           carbon: {
             name: "Carbon Fiber",
-            c: "#26282b",
+            c: "#23252a",
             d: 32,
             tag: "Stiff, poppy",
+            metal: 0.55,
+            rough: 0.55,
+            env: 0.6,
           },
         };
         const SWITCHES = {
@@ -1877,6 +1921,7 @@
         const LIGHT_COLORS = [
           "#cc785c",
           "#4184f3",
+          "#e86aa0",
           "#8a7bff",
           "#ff5ea8",
           "#4ea1ff",
@@ -2058,6 +2103,7 @@
             id: "claude",
             name: "Claude",
             s: {
+              brand: "claude",
               colorway: "claude",
               caseColor: "porcelain",
               plate: "brass",
@@ -2069,11 +2115,24 @@
             id: "gemini",
             name: "Gemini",
             s: {
+              brand: "gemini",
               colorway: "gemini",
               caseColor: "midnight",
               plate: "aluminum",
               sw: "ink",
               light: { mode: "static", color: "#4184f3", bright: 0.9 },
+            },
+          },
+          {
+            id: "sakura",
+            name: "Sakura",
+            s: {
+              brand: "sakura",
+              colorway: "sakura",
+              caseColor: "midnight",
+              plate: "poly",
+              sw: "jade",
+              light: { mode: "wave", color: "#e86aa0", bright: 1 },
             },
           },
           {
@@ -2123,6 +2182,7 @@
           layout: "75",
           profile: "cherry",
           material: "pbt",
+          brand: "claude",
           colorway: "claude",
           sw: "boba",
           caseColor: "porcelain",
@@ -2304,10 +2364,17 @@
         });
         const matPlate = new THREE.MeshStandardMaterial({
           color: sRGB(PLATES[state.plate].c),
-          metalness: 0.9,
-          roughness: 0.35,
-          envMapIntensity: 0.9,
+          metalness: PLATES[state.plate].metal,
+          roughness: PLATES[state.plate].rough,
+          envMapIntensity: PLATES[state.plate].env,
         });
+        function applyPlateFinish(id) {
+          const pl = PLATES[id];
+          matPlate.metalness = pl.metal;
+          matPlate.roughness = pl.rough;
+          matPlate.envMapIntensity = pl.env;
+          matPlate.needsUpdate = true;
+        }
         const matSwBody = new THREE.MeshStandardMaterial({
           color: sRGB(0x17171a),
           roughness: 0.45,
@@ -2371,6 +2438,31 @@
     }`,
         });
         glowMat.toneMapped = false;
+        /* per-key underglow: a soft rounded-square glow that sits at plate level
+           under each keycap, so RGB reads from under the keys (not one pool
+           under the whole board). Colour flows across the board in wave mode. */
+        const keyGlowMat = new THREE.ShaderMaterial({
+          uniforms: uni,
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          vertexShader:
+            "varying vec2 vUv;varying vec3 vW;void main(){vUv=uv;vW=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}",
+          fragmentShader:
+            HSL +
+            `
+    uniform float uTime,uBright;uniform int uMode;uniform vec3 uColor;varying vec2 vUv;varying vec3 vW;
+    void main(){
+      float pulse = uMode==2 ? (0.3+0.7*(0.5+0.5*sin(uTime*2.2))) : 1.0;
+      vec2 p = abs(vUv-0.5)*2.0;
+      float d = max(p.x,p.y);
+      float a = smoothstep(1.0,0.28,d)*uBright*pulse*2.4;
+      vec3 col = uMode==0 ? h2r(fract(vW.x*0.14+uTime*0.1)) : uColor;
+      gl_FragColor = vec4(col*a, a);
+    }`,
+        });
+        keyGlowMat.toneMapped = false;
+        const keyGlowGeo = new THREE.PlaneGeometry(1, 1);
 
         /* ---------------- geometry helpers ---------------- */
         function rrect(w, d, r) {
@@ -2507,6 +2599,133 @@
           g.restore();
         }
 
+        /* anime novelty stickers, drawn as keycap legends for the Sakura board */
+        function drawCat(g, W, H, color) {
+          const cx = W / 2,
+            cy = H / 2 + H * 0.04,
+            r = Math.min(W, H) * 0.27;
+          g.save();
+          g.fillStyle = color;
+          g.strokeStyle = color;
+          g.lineWidth = r * 0.13;
+          g.lineCap = "round";
+          /* head */
+          g.beginPath();
+          g.arc(cx, cy, r, 0, Math.PI * 2);
+          g.fill();
+          /* ears */
+          [-1, 1].forEach((s) => {
+            g.beginPath();
+            g.moveTo(cx + s * r * 0.55, cy - r * 0.75);
+            g.lineTo(cx + s * r * 0.95, cy - r * 1.5);
+            g.lineTo(cx + s * r * 1.05, cy - r * 0.55);
+            g.closePath();
+            g.fill();
+          });
+          /* face cut-outs: eyes + whiskers punched in bg-ish via clear */
+          g.globalCompositeOperation = "destination-out";
+          [-1, 1].forEach((s) => {
+            g.beginPath();
+            g.arc(cx + s * r * 0.38, cy - r * 0.05, r * 0.14, 0, Math.PI * 2);
+            g.fill();
+          });
+          /* mouth */
+          g.beginPath();
+          g.arc(cx, cy + r * 0.28, r * 0.22, 0.15 * Math.PI, 0.85 * Math.PI);
+          g.lineWidth = r * 0.1;
+          g.stroke();
+          g.restore();
+        }
+        function drawSakura(g, W, H, color) {
+          const cx = W / 2,
+            cy = H / 2,
+            R = Math.min(W, H) * 0.36;
+          g.save();
+          g.fillStyle = color;
+          for (let i = 0; i < 5; i++) {
+            const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
+            const px = cx + Math.cos(a) * R * 0.55,
+              py = cy + Math.sin(a) * R * 0.55;
+            g.beginPath();
+            g.ellipse(px, py, R * 0.34, R * 0.5, a + Math.PI / 2, 0, Math.PI * 2);
+            g.fill();
+          }
+          g.globalCompositeOperation = "destination-out";
+          g.beginPath();
+          g.arc(cx, cy, R * 0.2, 0, Math.PI * 2);
+          g.fill();
+          g.restore();
+        }
+        function drawStar(g, W, H, color) {
+          const cx = W / 2,
+            cy = H / 2,
+            R = Math.min(W, H) * 0.4;
+          g.save();
+          g.fillStyle = color;
+          g.beginPath();
+          for (let i = 0; i < 10; i++) {
+            const a = (i / 10) * Math.PI * 2 - Math.PI / 2,
+              rr = i % 2 ? R * 0.42 : R;
+            const x = cx + Math.cos(a) * rr,
+              y = cy + Math.sin(a) * rr;
+            i ? g.lineTo(x, y) : g.moveTo(x, y);
+          }
+          g.closePath();
+          g.fill();
+          g.restore();
+        }
+        function drawHeart(g, W, H, color) {
+          const cx = W / 2,
+            cy = H / 2,
+            R = Math.min(W, H) * 0.36;
+          g.save();
+          g.fillStyle = color;
+          g.beginPath();
+          g.moveTo(cx, cy + R * 0.75);
+          g.bezierCurveTo(cx - R * 1.5, cy - R * 0.4, cx - R * 0.5, cy - R, cx, cy - R * 0.3);
+          g.bezierCurveTo(cx + R * 0.5, cy - R, cx + R * 1.5, cy - R * 0.4, cx, cy + R * 0.75);
+          g.closePath();
+          g.fill();
+          g.restore();
+        }
+        const MARKS = {
+          claude: drawClaudeMark,
+          gemini: drawGeminiMark,
+          cat: drawCat,
+          blossom: drawSakura,
+          sparkles: drawStar,
+          heart: drawHeart,
+        };
+
+        /* Sakura novelty keys use real emoji sticker art (Twemoji, CC-BY,
+           served with CORS so it can texture the caps without tainting the
+           canvas). The vector MARKS above are the offline fallback. */
+        const EMOJI = {
+          cat: "1f431",
+          blossom: "1f338",
+          sparkles: "2728",
+          heart: "1f49c",
+        };
+        const emojiUrl = (cp) =>
+          "https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/72x72/" +
+          cp +
+          ".png";
+        const emojiImg = {};
+        function preloadEmoji() {
+          Object.entries(EMOJI).forEach(([id, cp]) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            const rec = { img, ready: false };
+            img.onload = () => {
+              rec.ready = true;
+              legendCache.clear();
+              if (state.brand) refreshLegends();
+            };
+            img.src = emojiUrl(cp);
+            emojiImg[id] = rec;
+          });
+        }
+
         /* legend textures, cached per label+width+color. Super-sampled 2x with a
            heavier weight so small legends stay crisp instead of washing out. */
         const legendCache = new Map();
@@ -2520,10 +2739,12 @@
           c.width = W;
           c.height = H;
           const g = c.getContext("2d");
-          if (mark === "gemini") {
-            drawGeminiMark(g, W, H, fg);
-          } else if (mark === "claude") {
-            drawClaudeMark(g, W, H, fg);
+          const em = mark && emojiImg[mark];
+          if (em && em.ready) {
+            const sz = Math.min(W, H) * 0.76;
+            g.drawImage(em.img, (W - sz) / 2, (H - sz) / 2, sz, sz);
+          } else if (mark && MARKS[mark]) {
+            MARKS[mark](g, W, H, fg);
           } else {
             g.fillStyle = fg;
             g.textBaseline = "top";
@@ -2550,20 +2771,28 @@
           legendCache.set(key, t);
           return t;
         }
-        /* the Esc key carries a brand mascot instead of a text legend for the
-           AI-brand colorways; returns the mark type or null */
+        /* per-keyboard (brand) novelty art. The brand travels with the board the
+           user picked, NOT the keycap colorway, so recolouring keeps the logo. */
+        const BRAND_MARKS = {
+          claude: { Esc: "claude" },
+          gemini: { Esc: "gemini" },
+          sakura: {
+            Esc: "cat",
+            Enter: "blossom",
+            Fn: "sparkles",
+            Win: "heart",
+          },
+        };
         const markFor = (label) =>
-          label === "Esc" &&
-          (state.colorway === "claude" || state.colorway === "gemini")
-            ? state.colorway
-            : null;
+          (BRAND_MARKS[state.brand] && BRAND_MARKS[state.brand][label]) || null;
 
         /* ---------------- board construction ---------------- */
         const caseGroup = new THREE.Group(),
           capsGroup = new THREE.Group(),
           switchGroup = new THREE.Group(),
-          knobGroup = new THREE.Group();
-        root.add(caseGroup, capsGroup, switchGroup, knobGroup);
+          knobGroup = new THREE.Group(),
+          keyGlowGroup = new THREE.Group();
+        root.add(caseGroup, capsGroup, switchGroup, knobGroup, keyGlowGroup);
         const CAP_Y = 1.1;
         let plateMesh = null,
           plateBaseY = 0.6,
@@ -2615,7 +2844,11 @@
           while (gr.children.length) {
             const o = gr.children.pop();
             o.traverse((n) => {
-              if (n.geometry && !capGeoCache.has(n.userData.gk))
+              if (
+                n.geometry &&
+                !n.userData.keepGeo &&
+                !capGeoCache.has(n.userData.gk)
+              )
                 n.geometry.dispose();
             });
           }
@@ -2726,6 +2959,7 @@
         function buildKeys() {
           disposeGroup(capsGroup);
           disposeGroup(switchGroup);
+          disposeGroup(keyGlowGroup);
           const L = LAYOUTS[state.layout],
             rows = L.rows(),
             center = L.total / 2,
@@ -2780,6 +3014,14 @@
               }
               capsGroup.add(mesh);
               switchGroup.add(makeSwitch(cx, cz));
+              /* per-key underglow pad, sitting at plate level under the cap */
+              const glow = new THREE.Mesh(keyGlowGeo, keyGlowMat);
+              glow.rotation.x = -Math.PI / 2;
+              glow.position.set(cx, 1.02, cz);
+              glow.scale.set(keyDef.w * 1.16, 1.16, 1);
+              glow.renderOrder = 1;
+              glow.userData.keepGeo = true;
+              keyGlowGroup.add(glow);
             });
           });
         }
@@ -3076,12 +3318,15 @@
 
         /* ---------------- instant apply (thumbnails + presets core) ---------------- */
         function applyInstant(s) {
+          if (s.brand !== undefined) state.brand = s.brand;
           if (s.colorway) {
             const cw = COLORWAYS[s.colorway];
             matAlpha.color.copy(sRGB(cw.a.bg));
             matMod.color.copy(sRGB(cw.m.bg));
             matAccent.color.copy(sRGB(cw.x.bg));
             state.colorway = s.colorway;
+            refreshLegends();
+          } else if (s.brand !== undefined) {
             refreshLegends();
           }
           if (s.caseColor) {
@@ -3097,6 +3342,7 @@
           }
           if (s.plate) {
             matPlate.color.copy(sRGB(PLATES[s.plate].c));
+            applyPlateFinish(s.plate);
             state.plate = s.plate;
           }
           if (s.sw) {
@@ -3132,11 +3378,15 @@
           caseGroup.children.forEach((c) => {
             if (c.material === skirtMat) c.visible = on;
           });
-          glowPlane.visible = on;
+          keyGlowGroup.visible = on;
+          /* faint desk pool kept for grounding, but the main RGB now reads from
+             under the keys via keyGlowGroup */
+          glowPlane.visible = false;
         }
         function stateSlice() {
           return JSON.parse(
             JSON.stringify({
+              brand: state.brand,
               colorway: state.colorway,
               caseColor: state.caseColor,
               finish: state.finish,
@@ -3225,7 +3475,10 @@
               duration: 0.5,
             });
           }
-          if (patch.plate) tweenColor(matPlate, PLATES[patch.plate].c);
+          if (patch.plate) {
+            tweenColor(matPlate, PLATES[patch.plate].c);
+            applyPlateFinish(patch.plate);
+          }
           if (patch.sw) tweenColor(matStem, SWITCHES[patch.sw].dot, 0.4);
           if (patch.material) {
             const m = MATERIALS[patch.material];
@@ -3380,8 +3633,8 @@
                 )
                 .join("") +
               "</div>";
-            const kcap = (l, c, fg, st) =>
-              `<div class="kc" style="background:linear-gradient(180deg,${c},${c});color:${fg};${st}">${l}</div>`;
+            const kcap = (l, c, fg, st, mid) =>
+              `<div class="kc" style="--bg:${c};--fg:${fg};${st}"><span class="kctop${mid ? " mid" : ""}">${l}</span></div>`;
             return `
       <div class="grp"><div class="glabel">Profile</div>${prof}</div>
       <div class="grp"><div class="glabel">Material</div>${chipRow(
@@ -3401,10 +3654,10 @@
           "colorway",
         )}</div>
       <div class="preview">
-        ${kcap("Esc", cw.x.bg, cw.x.fg, "width:60px;height:60px;left:36px;top:32px")}
-        ${kcap("A", cw.a.bg, cw.a.fg, "width:60px;height:60px;left:158px;top:22px")}
-        ${kcap("\u21b5 Enter", cw.x.bg, cw.x.fg, "width:106px;height:60px;left:28px;top:112px")}
-        ${kcap("Fn", cw.m.bg, cw.m.fg, "width:60px;height:60px;left:172px;top:118px")}
+        ${kcap("Esc", cw.x.bg, cw.x.fg, "width:62px;height:62px;left:26px;top:26px")}
+        ${kcap("A", cw.a.bg, cw.a.fg, "width:62px;height:62px;left:176px;top:22px")}
+        ${kcap("\u21b5 Enter", cw.x.bg, cw.x.fg, "width:136px;height:62px;left:26px;top:116px", true)}
+        ${kcap("Fn", cw.m.bg, cw.m.fg, "width:62px;height:62px;left:176px;top:116px")}
       </div>
       <button class="libBtn" data-act="library">View Keycap Library
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg></button>`;
@@ -3581,6 +3834,7 @@
         /* ---------------- featured builds ---------------- */
         function presetPatch(p) {
           const patch = {
+            brand: p.s.brand || null,
             colorway: p.s.colorway,
             caseColor: p.s.caseColor,
             sw: p.s.sw,
@@ -3972,6 +4226,7 @@
         }
 
         /* ---------------- boot ---------------- */
+        preloadEmoji();
         rebuildBoard();
         applyLight();
         resize();
