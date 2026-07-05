@@ -165,17 +165,3 @@ export const BRAND_MARKS = {
   sakura: { Esc: "cat", Enter: "blossom", Fn: "sparkles", Win: "heart" },
 };
 
-export function preloadEmoji() {
-  Object.entries(EMOJI).forEach(([id, cp]) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    const rec = { img, ready: false };
-    img.onload = () => {
-      rec.ready = true;
-      legendCache.clear();
-      if (state.brand) refreshLegends();
-    };
-    img.src = emojiUrl(cp);
-    emojiImg[id] = rec;
-  });
-}

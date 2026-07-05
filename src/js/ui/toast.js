@@ -1,7 +1,8 @@
+import gsap from 'gsap';
+
 export function toast(msg) {
   const el = document.getElementById('toast');
   el.textContent = msg;
-  const gsap = window.gsap;
   gsap.killTweensOf(el);
   gsap.set(el, { opacity: 0, y: -16 });
   gsap.to(el, { opacity: 1, y: 0, duration: 0.28, ease: 'power2.out' });

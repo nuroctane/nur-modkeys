@@ -16,7 +16,7 @@ import {
   getEffectiveImage, getEffectiveFontSize, hasGlow, hasImageBehindText,
   getOverride, keyId as perKeyId, getAllEntries,
 } from './perKey.js';
-import { composeLegend } from './imageLoader.js';
+import { composeLegend, renderText } from './imageLoader.js';
 
 export let plateMesh = null;
 let plateBaseY = 0.6;
@@ -94,6 +94,18 @@ function capGeo(wU, profId) {
 
 /* legend textures */
 const legendCache = new Map();
+const L_CACHE_MAX = 200;
+function legendCacheSet(k, v) {
+  if (legendCache.size >= L_CACHE_MAX) {
+    const first = legendCache.keys().next().value;
+    if (first !== undefined) {
+      const old = legendCache.get(first);
+      if (old) old.dispose();
+      legendCache.delete(first);
+    }
+  }
+  legendCache.set(k, v);
+}
 const S = 2;
 function legendTex(label, wU, fg, mark, opts) {
   opts = opts || {};
@@ -117,10 +129,10 @@ function legendTex(label, wU, fg, mark, opts) {
     const dw = iw * scale, dh = ih * scale;
     g.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
     if (opts.imageBehindText && useText) {
-      renderCanvasText(g, useText, useFg, opts.fontSize || 29, W, H, S, pad);
+      renderText(g, useText, useFg, opts.fontSize || 29, W, H, S, pad);
     }
   } else if (opts.glow) {
-    renderCanvasText(g, useText, '#ffffff', opts.fontSize || 29, W, H, S, pad);
+    renderText(g, useText, '#ffffff', opts.fontSize || 29, W, H, S, pad);
   } else if (useText) {
     const em = mark && emojiImg[mark];
     if (em && em.ready) {
@@ -129,35 +141,17 @@ function legendTex(label, wU, fg, mark, opts) {
     } else if (mark && MARKS[mark]) {
       MARKS[mark](g, W, H, useFg);
     } else {
-      renderCanvasText(g, useText, useFg, opts.fontSize || 29, W, H, S, pad);
+      renderText(g, useText, useFg, opts.fontSize || 29, W, H, S, pad);
     }
   }
   const t = new THREE.CanvasTexture(c);
   t.anisotropy = renderer.capabilities.getMaxAnisotropy();
   t.colorSpace = THREE.SRGBColorSpace;
-  if (!opts.glow) legendCache.set(cacheKey, t);
+  if (!opts.glow) legendCacheSet(cacheKey, t);
   return t;
 }
 
-function renderCanvasText(g, text, fg, fs, W, H, S, pad) {
-  const F = '"Inter","Segoe UI",Arial,sans-serif';
-  g.fillStyle = fg || '#000000';
-  g.textBaseline = 'top';
-  const lines = text.split('\n');
-  if (lines.length === 2) {
-    g.font = '700 ' + 27 * S + 'px ' + F;
-    g.fillText(lines[0], pad, pad);
-    g.fillText(lines[1], pad, pad + 44 * S);
-  } else {
-    let fontSize = fs * S;
-    g.font = '700 ' + fontSize + 'px ' + F;
-    while (g.measureText(text).width > W - pad * 2 && fontSize > 15 * S) {
-      fontSize--;
-      g.font = '700 ' + fontSize + 'px ' + F;
-    }
-    g.fillText(text, pad, pad + 4 * S);
-  }
-}
+
 
 const emojiImg = {};
 export function preloadEmoji() {

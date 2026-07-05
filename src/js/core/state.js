@@ -25,6 +25,8 @@ export { state };
 
 export function stateSlice() {
   return JSON.parse(JSON.stringify({
+    layout: state.layout,
+    profile: state.profile,
     brand: state.brand,
     colorway: state.colorway,
     caseColor: state.caseColor,
@@ -36,5 +38,9 @@ export function stateSlice() {
     extras: state.extras,
     customColors: state.customColors,
     perKeyOverrides: state.perKeyOverrides,
+    view: state.view,
+    tool: state.tool,
+    exploded: state.exploded,
+    theme: state.theme,
   }));
 }

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import gsap from 'gsap';
 import { renderer, scene, camera, root, caseGroup, capsGroup, knobGroup, uni } from './scene.js';
 import { plateMesh } from './keyboard.js';
 import { state } from './state.js';
@@ -40,13 +41,19 @@ const VIEWS = {
   front: { theta: 0, phi: 1.3, radius: 9.9, ty: 0.1 },
 };
 
+const RM = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 export function flyTo(v, dur) {
   ctrl.vT = ctrl.vP = 0;
+  if (RM()) {
+    Object.assign(ctrl, { theta: v.theta, phi: v.phi, radius: v.radius });
+    ctrl.target.y = v.ty;
+    return;
+  }
   const twoPi = Math.PI * 2;
   let dT = (v.theta - ctrl.theta) % twoPi;
   if (dT > Math.PI) dT -= twoPi;
   if (dT < -Math.PI) dT += twoPi;
-  const gsap = window.gsap;
   gsap.to(ctrl, {
     theta: ctrl.theta + dT,
     phi: v.phi,
@@ -64,8 +71,13 @@ export function flyTo(v, dur) {
 }
 
 function setExplode(on) {
-  const gsap = window.gsap;
   state.exploded = on;
+  if (RM()) {
+    capsGroup.children.forEach((c) => { c.position.y = c.userData.baseY + (on ? 1.0 + c.userData.row * 0.16 : 0); });
+    if (plateMesh) plateMesh.position.y = 0.6 + (on ? 0.4 : 0);
+    knobGroup.position.y = 1.04 + (on ? 0.85 : 0);
+    return;
+  }
   capsGroup.children.forEach((c) => {
     gsap.to(c.position, {
       y: c.userData.baseY + (on ? 1.0 + c.userData.row * 0.16 : 0),
@@ -178,12 +190,15 @@ canvas.addEventListener('pointermove', (ev) => {
   const hit = overKnob ? null : capOf(pick(capsGroup.children, ev));
   canvas.style.cursor = overKnob ? 'ew-resize' : hit ? 'pointer' : '';
   if (hit !== hoverCap) {
-    const gsap = window.gsap;
-    if (hoverCap && !state.exploded)
-      gsap.to(hoverCap.position, { y: hoverCap.userData.baseY, duration: 0.35, ease: 'power2.out', overwrite: 'auto' });
+    if (hoverCap && !state.exploded) {
+      if (RM()) hoverCap.position.y = hoverCap.userData.baseY;
+      else gsap.to(hoverCap.position, { y: hoverCap.userData.baseY, duration: 0.35, ease: 'power2.out', overwrite: 'auto' });
+    }
     hoverCap = hit;
-    if (hoverCap && !state.exploded)
-      gsap.to(hoverCap.position, { y: hoverCap.userData.baseY + 0.055, duration: 0.3, ease: 'power2.out', overwrite: 'auto' });
+    if (hoverCap && !state.exploded) {
+      if (RM()) hoverCap.position.y = hoverCap.userData.baseY + 0.055;
+      else gsap.to(hoverCap.position, { y: hoverCap.userData.baseY + 0.055, duration: 0.3, ease: 'power2.out', overwrite: 'auto' });
+    }
   }
 });
 
@@ -206,10 +221,13 @@ function endPointer(ev) {
       lastClickKey = hit;
       lastClickTime = now;
       playSwitch(SWITCHES[state.sw].sound);
-      const gsap = window.gsap;
-      gsap.timeline()
-        .to(hit.position, { y: hit.userData.baseY - 0.07, duration: 0.07, ease: 'power2.in' })
-        .to(hit.position, { y: hit.userData.baseY + 0.055, duration: 0.22, ease: 'back.out(3)' });
+      if (RM()) {
+        hit.position.y = hit.userData.baseY + 0.055;
+      } else {
+        gsap.timeline()
+          .to(hit.position, { y: hit.userData.baseY - 0.07, duration: 0.07, ease: 'power2.in' })
+          .to(hit.position, { y: hit.userData.baseY + 0.055, duration: 0.22, ease: 'back.out(3)' });
+      }
     }
   }
   dragMode = null;

@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import gsap from 'gsap';
-window.gsap = gsap;
 
 import { state, stateSlice } from './core/state.js';
 import { registerSyncUI, setState, undo, redo } from './core/update.js';
@@ -23,7 +22,7 @@ import { downloadSVG } from './export/svg.js';
 import { downloadSpec } from './export/spec.js';
 import { loadHash, shareURL } from './core/shrinker.js';
 import { clearAllOverrides } from './core/perKey.js';
-import { resetHistory } from './core/history.js';
+import { resetHistory, canUndo, canRedo } from './core/history.js';
 
 registerSyncUI(syncUI);
 
@@ -206,6 +205,10 @@ function genThumbs() {
 
 /* render loop */
 const clock = new THREE.Clock();
+const undoToggle = () => {
+  document.getElementById('toolUndo').toggleAttribute('disabled', !canUndo());
+  document.getElementById('toolRedo').toggleAttribute('disabled', !canRedo());
+};
 function tick() {
   requestAnimationFrame(tick);
   uni.uTime.value = clock.getElapsedTime();
@@ -217,6 +220,7 @@ function tick() {
   }
   ctrl.apply();
   renderer.render(scene, camera);
+  undoToggle();
 }
 
 /* boot */
@@ -237,15 +241,18 @@ requestAnimationFrame(() => {
     renderPanel('keycaps');
     syncUI();
     setView('3d');
-    gsap.from(root.scale, {
-      x: 0.45 * 0.9, y: 0.45 * 0.9, z: 0.45 * 0.9,
-      duration: 1.1, ease: 'power3.out',
-    });
-    gsap.from(root.rotation, {
-      y: -0.4, duration: 1.3, ease: 'power3.out',
-    });
+    const rm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!rm) {
+      gsap.from(root.scale, {
+        x: 0.45 * 0.9, y: 0.45 * 0.9, z: 0.45 * 0.9,
+        duration: 1.1, ease: 'power3.out',
+      });
+      gsap.from(root.rotation, {
+        y: -0.4, duration: 1.3, ease: 'power3.out',
+      });
+    }
     gsap.to(document.getElementById('loader'), {
-      opacity: 0, duration: 0.5, delay: 0.15,
+      opacity: 0, duration: rm ? 0.2 : 0.5,
       onComplete: () => document.getElementById('loader').remove(),
     });
   });

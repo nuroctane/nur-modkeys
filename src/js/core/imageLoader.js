@@ -34,7 +34,7 @@ export function composeLegend(opts) {
   return c;
 }
 
-function renderText(g, text, fg, fs, W, H, S, pad) {
+export function renderText(g, text, fg, fs, W, H, S, pad) {
   const F = '"Inter","Segoe UI",Arial,sans-serif';
   g.fillStyle = fg || '#000000';
   g.textBaseline = 'top';

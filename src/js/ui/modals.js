@@ -64,6 +64,8 @@ export function openGallery() {
         `<button class="galCard" data-saved="${i}"><img src="${b.img}" alt="">
           <div class="cap"><div class="nm">${b.name}</div><div class="tg">${COLORWAYS[b.snap.colorway].name}</div></div></button>`,
       ).join('') + '</div>';
+  } else {
+    html += '<div class="secTitle">YOUR BUILDS</div><div class="hint" style="margin-bottom:16px">No saved builds yet. Use <strong>Save Build</strong> in the sidebar to save your first one.</div>';
   }
   openModal('Gallery', html);
 }

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import gsap from 'gsap';
 import { state, stateSlice } from './state.js';
 import { LAYOUTS } from '../data/layouts.js';
 import { COLORWAYS } from '../data/colorways.js';
@@ -13,6 +14,7 @@ import { setView } from './controls.js';
 import { pushState, undo as undoHistory, redo as redoHistory } from './history.js';
 
 let _syncUI = null;
+const RM = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export function registerSyncUI(fn) {
   _syncUI = fn;
@@ -109,7 +111,6 @@ function applyInstant(s) {
 }
 
 function popKeys() {
-  const gsap = window.gsap;
   capsGroup.children.forEach((c) => {
     gsap.from(c.position, {
       y: c.userData.baseY + 0.5,
@@ -122,8 +123,9 @@ function popKeys() {
 }
 
 function tweenColor(mat, hex, d) {
+  if (RM()) { mat.color.copy(sRGB(hex)); return; }
   const c = sRGB(hex);
-  window.gsap.to(mat.color, {
+  gsap.to(mat.color, {
     r: c.r, g: c.g, b: c.b,
     duration: d || 0.55,
     ease: 'power2.out',
@@ -132,8 +134,7 @@ function tweenColor(mat, hex, d) {
 }
 
 function apply3D(patch, animate) {
-  const gsap = window.gsap;
-  if (!animate) {
+  if (!animate || RM()) {
     applyInstant(patch);
     if (patch.layout) { state.layout = patch.layout; rebuildBoard(); }
     if (patch.profile) { state.profile = patch.profile; buildKeys(); }
