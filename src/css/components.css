@@ -902,3 +902,11 @@ button, .chip, .sw, .profBtn, .dShell .snav button, .tnav button, .pills button,
 
 /* Landscape phones: a fixed 340px stage plus bars leaves no room for the
    panel; give the stage proportional height and slim the chrome. */
+
+/* v0.74: key-image upload restriction hint (shared panel content) */
+.keHint {
+  font-size: 10.5px;
+  color: var(--ink2);
+  margin: 4px 6px 0;
+  letter-spacing: 0.02em;
+}

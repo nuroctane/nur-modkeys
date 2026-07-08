@@ -43,8 +43,8 @@ const tplStart = html.indexOf('<template id="mShellTpl">');
 const tplEnd = html.indexOf('</template>', tplStart);
 if (tplStart === -1 || tplEnd === -1) { console.error('mShellTpl not found'); process.exit(1); }
 const mShell = html.slice(tplStart, tplEnd);
-const dStart = html.indexOf('<div class="app" id="dShell">');
-if (dStart === -1) { console.error('#dShell not found'); process.exit(1); }
+const dStart = html.search(/<div class="app dShell" id="dShell">/);
+if (dStart === -1) { console.error('#dShell (class app dShell) not found'); process.exit(1); }
 const dShell = html.slice(dStart, tplStart);
 /* shared overlays: everything after the template close (kePop, modal, toast)
    plus the loader before #dShell */

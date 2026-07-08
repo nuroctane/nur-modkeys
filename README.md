@@ -4,30 +4,31 @@
 
 # MODKEYS — Keyboard Configurator
 
-A browser-based mechanical keyboard configurator and 3D visualization tool. Build, customize, and share your dream keyboard — entirely in the browser.
+A browser-based mechanical keyboard configurator and 3D visualization tool. Build, customize, and share your dream keyboard — entirely in the browser, on desktop and mobile.
 
-**[Try it live](https://modkeys.vercel.app/)**
+**[Try it live](https://modkeys.vercel.app/)** · also embedded at [nuroctane.xyz/modkeys](https://nuroctane.xyz/modkeys)
 
 ---
 
 ## Features
 
-- **3D keyboard preview** powered by Three.js — orbit, pan, and zoom around a fully rendered keyboard
+- **Desktop + mobile shells** — purpose-built layouts (not a shrunk desktop). Mobile boots a dedicated shell via `matchMedia` with bottom tabs, stage icon bar, and safe-area handling
+- **3D keyboard preview** powered by Three.js — orbit, pan, and zoom (mouse, trackpad, or touch)
 - **Multiple layouts**: 60% Compact, 65% Standard, 75% Pro (with rotary knob)
-- **Keycap profiles**: Cherry, OEM, XDA, SA, DSA, MT3, ASA — each with accurate geometry, dish, and row tilt
-- **Colorways**: 19 curated presets (Claude, Gemini, Sakura, Verdant, Abyssal, Dune, Monochrome, Umbra, Moss, Contrast, Rosette, Noir, Embers, Matcha, Carbon, Vaporwave, Dracula, Blush, Honey) with full custom color support
-- **Custom colors**: Fine-tune alpha, mod, and accent key colors with live hex preview
-- **Per-key customization**: Custom text, font size, foreground/background colors, glow effect, image upload, and emoji marks on individual keys
-- **Case & plate**: 16 case colors, 3 finishes (anodized/soft-touch/polished), 8 plate materials (aluminum/brass/polycarbonate/carbon fiber/copper/steel/POM/FR4)
-- **Switches**: 10 switch types (Boba U4T, Holy Panda, Box Jade, Silent Ink, Cream, Teal, Sunset, Topaz, Emerald, Silver) — each with distinctive 3D rendering and audible click feedback (Web Audio)
-- **Lighting**: Wave, Static, Breathe, or Off — with color picker and brightness control; underglow and per-key glow with GLSL shaders
-- **Extras**: Rotary knob, coiled cable (3D tube geometry), walnut wrist rest (extruded mesh), switch lubing service
-- **Undo/Redo**: Full history stack (up to 50 states) with keyboard shortcuts
-- **Export**: KLE (Keyboard Layout Editor) JSON, SVG template for manufacturing, full spec sheet JSON
-- **Share**: URL-based state sharing (base64-encoded in the hash fragment)
-- **Presets**: 15 featured builds you can load instantly
-- **Save builds**: Save your creations to the gallery and browse them later
-- **Dark/Light theme**: Toggle between themes with adjusted 3D lighting
+- **Keycap profiles**: Cherry, OEM, XDA, SA, DSA, MT3, ASA — accurate geometry, dish, and row tilt
+- **Colorways**: 19 curated presets (Claude, Gemini, Sakura, Verdant, Abyssal, Dune, Monochrome, Umbra, Moss, Contrast, Rosette, Noir, Embers, Matcha, Carbon, Vaporwave, Dracula, Blush, Honey) plus full custom colors
+- **Custom colors**: Alpha, mod, and accent keys with live hex preview
+- **Per-key customization**: Text, font size, foreground/background, glow, image upload, emoji marks
+- **Case & plate**: 16 case colors, 3 finishes (anodized / soft-touch / polished), 8 plate materials (aluminum, brass, polycarbonate, carbon fiber, copper, steel, POM, FR4)
+- **Switches**: 10 types (Boba U4T, Holy Panda, Box Jade, Silent Ink, Cream, Teal, Sunset, Topaz, Emerald, Silver) with distinctive 3D rendering and Web Audio click feedback
+- **Lighting**: Wave, Static, Breathe, or Off — color + brightness; underglow and per-key glow (GLSL)
+- **Extras**: Rotary knob, coiled cable, walnut wrist rest, switch lubing service
+- **Undo/Redo**: History stack (up to 50 states) with keyboard shortcuts
+- **Export**: KLE JSON, SVG manufacturing template, full spec sheet JSON, and PDF
+- **Share**: URL-encoded build state (base64 hash fragment)
+- **Presets**: 15 featured builds
+- **Save builds**: Local gallery of saved creations
+- **Dark/Light theme**: Toggle with adjusted 3D lighting
 
 ---
 
@@ -36,53 +37,60 @@ A browser-based mechanical keyboard configurator and 3D visualization tool. Buil
 | Layer | Technology |
 |---|---|
 | **Build** | [Vite 6](https://vitejs.dev) |
-| **JavaScript** | Vanilla ES Modules (no framework) |
-| **3D** | [Three.js r170](https://threejs.org) — WebGL, PCFSoft shadows, PMREM environment, custom GLSL shaders |
-| **Animation** | [GSAP 3.12](https://gsap.com) |
-| **Audio** | Web Audio API (procedural synthesis, no audio files) |
+| **JavaScript** | Vanilla ES modules (no framework) |
+| **3D** | [Three.js](https://threejs.org) (^0.184) — WebGL, soft shadows, PMREM environment, custom GLSL |
+| **Animation** | [GSAP](https://gsap.com) (^3.12) |
+| **Audio** | Web Audio API (procedural synthesis; no audio files) |
 | **Emoji** | [Twemoji](https://github.com/jdecked/twemoji) via CDN |
-| **CSS** | Vanilla CSS with custom properties (theming), CSS Grid layout |
-| **Export** | KLE JSON, SVG templates, JSON spec sheets |
+| **CSS** | Vanilla CSS + custom properties; desktop in `layout.css` / `components.css`; mobile in `mobile.css` |
+| **Shell** | Dual layout: desktop `#dShell` + mobile `<template id="mShellTpl">`, selected at boot by `shell.js` |
+| **Export** | KLE, SVG, JSON spec, PDF via [jsPDF](https://github.com/parallax/jsPDF) + svg2pdf.js |
 
 ---
 
 ## Project Structure
 
 ```
-index.html              Main SPA shell
+index.html              Main SPA — desktop shell + mobile template
+MOBILE_SHELL.md         Dual-shell architecture notes
+check-shell-ids.mjs     ID parity checker (desktop ↔ mobile)
+check-spa-shell.mjs     SPA shell integrity check
 src/
   css/
-    variables.css       CSS custom properties (light/dark theme)
-    layout.css          Grid layout, sidebar, topbar, content grid
-    components.css      All component styles (pills, toolbar, cards, modals, key editor, toggles, loader)
+    variables.css       Theme tokens (light/dark)
+    layout.css          Desktop grid (no responsive @media)
+    components.css      Desktop components
+    mobile.css          Mobile shell (.mShell / html.mk-mobile)
   js/
-    app.js              Entry point — bootstraps all modules and the render loop
+    app.js              Entry — modules + render loop
+    shell.js            Desktop vs mobile selection at boot
     core/
-      state.js          Global mutable state + serialization
-      scene.js          Three.js scene, renderer, materials, GLSL shaders
-      keyboard.js       Keyboard geometry, keycap profiles, legend textures
-      controls.js       Camera controls, pointer interaction, raycasting, key picking
-      update.js         State → 3D pipeline, undo/redo orchestration
-      history.js        Undo/redo stack (max 50)
+      state.js          Mutable state + serialization
+      scene.js          Three.js scene, materials, shaders
+      keyboard.js       Geometry, profiles, legend textures
+      controls.js       Camera, pointer/touch, key picking
+      update.js         State → 3D pipeline, undo/redo
+      history.js        Undo stack (max 50)
       shrinker.js       URL serialization (base64)
-      perKey.js         Per-key override store
-      imageLoader.js    Image loading, canvas text rendering
+      perKey.js         Per-key overrides
+      imageLoader.js    Images + canvas text
     data/
-      layouts.js        Keyboard layout definitions (60%, 65%, 75%)
-      colorways.js      19 colorway presets + panel swatches
-      components.js     Cases, finishes, plates, switches, materials, extras, profiles, light colors
-      presets.js        15 featured build presets (with brand marks)
-      art.js            Vector mark drawing functions + brand mark SVGs + emoji definitions
+      layouts.js        60% / 65% / 75%
+      colorways.js      19 presets + swatches
+      components.js     Cases, plates, switches, extras, profiles
+      presets.js        Featured builds
+      art.js            Marks, brand SVGs, emoji defs
     ui/
-      panels.js         Right panel rendering, key editor popover
-      modals.js         Modal/drawer system (Gallery, Library, Switches, Accessories)
-      theme.js          Light/dark theme toggle + 3D lighting adjustment
-      toast.js          Toast notifications
-      sound.js          Web Audio switch sound synthesis
+      panels.js         Config panels + key editor
+      modals.js         Gallery, Library, Switches, Accessories
+      theme.js          Light/dark + 3D lighting
+      toast.js          Toasts
+      sound.js          Switch sound synthesis
     export/
-      kle.js            KLE JSON export
-      svg.js            SVG template export
-      spec.js           Spec sheet JSON export (with per-key image data)
+      kle.js            KLE JSON
+      svg.js            SVG template
+      pdf.js            PDF
+      spec.js           Spec sheet JSON
 ```
 
 ---
@@ -90,33 +98,34 @@ src/
 ## Usage
 
 ### Builder
-The main view shows a 3D keyboard. Use the sidebar to navigate configuration sections:
+3D keyboard center stage.
+
+**Desktop:** sidebar sections —  
 **Layout** → **Keycaps** → **Switches** → **Case** → **Plate** → **Lighting** → **Extras**
 
+**Mobile:** the same sections as bottom **section tabs**.
+
 ### 3D Controls
-- **Orbit**: Click and drag (default)
-- **Pan**: Toggle the hand icon or hold Shift + drag
-- **Zoom**: Scroll wheel or pinch (touch)
-- **Views**: 3D, Explode, Top, Side, Front via the pill switcher above the canvas (desktop) or the icon bar pinned to the stage bottom (mobile)
+- **Orbit** — click/drag or one-finger drag
+- **Pan** — hand icon or Shift + drag
+- **Zoom** — scroll wheel or pinch
+- **Views** — 3D, Explode, Top, Side, Front via pills above the canvas (desktop) or the stage-bottom icon bar (mobile)
 
 ### Mobile
 
-On phones and tablets the configurator swaps in a dedicated mobile shell at boot
-(via `matchMedia`). The experience is purpose-built, not a shrunk desktop:
-- **View pills** render as a bottom icon bar — cube (3D), two offset squares
-  (Explode), square + down-arrow (Top), tall rectangle + right-arrow (Side),
-  rectangle + up-arrow (Front) — so all five fit portrait screens.
-- **Section tabs** along the bottom switch Layout → Keycaps → Switches →
-  Case → Plate → Lighting → Extras.
-- **Material sounds**: tapping a key plays the switch sound; PBT keeps the
-  deep thock, while ABS and Ceramic add a brighter resonance layer.
-- **Safe-area + dvh** handling keeps controls clear of notches and home bars.
+On phones and tablets a dedicated mobile shell swaps in at boot (`matchMedia`). Purpose-built, not a scaled desktop:
+- **View pills** as a bottom icon bar (all five views fit portrait)
+- **Section tabs** for Layout → … → Extras
+- **Save / Export** in a fixed bottom bar; Export opens a sheet (KLE, SVG, PDF, spec)
+- **Material sounds** on key tap (PBT thock; ABS/Ceramic add resonance)
+- **Safe-area + `dvh`** for notches and home bars
+- **Breakpoint**: `(max-width: 768px)` or coarse pointer up to `1024px`. Crossing reloads so the correct shell binds (see `MOBILE_SHELL.md`)
 
 ### Per-key Customization
-Double-click any key on the 3D board to open the key editor. Customize text, colors, glow, and images.
+Double-click a key (desktop) to open the key editor — text, colors, glow, images.
 
 ### Sharing
-Click the share icon in the toolbar to copy a URL that encodes your current build state.
+Share icon copies a URL that encodes the current build.
 
 ---
 

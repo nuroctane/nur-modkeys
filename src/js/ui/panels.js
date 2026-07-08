@@ -105,7 +105,7 @@ const PANELS = {
   <div class="glabel">KEY IMAGE</div>
   <div class="hint">Double-click a key to select it, then upload an image below.</div>
   <input type="file" id="keImageSidebar" accept="image/png,image/jpeg" class="keFile">
-  <div class="hint">Accepted formats: PNG, JPG · Max file size: 25 MB</div>
+  <div class="keHint">PNG or JPG &middot; max 25 MB</div>
   <div id="keSidebarPreview"></div>
 </div>`;
   },
@@ -204,7 +204,8 @@ export function showKeyEditor(keyData) {
   <div class="keRow"><label>BG color</label><input type="color" id="keBg" value="${ov.bgColor || '#ffffff'}" class="keColor"></div>
   <div class="keRow"><label>Glow text</label><label class="keToggle ${ov.glow ? 'on' : ''}" id="keGlow"><span></span></label></div>
   <div class="keRow"><label>Image behind text</label><label class="keToggle ${ov.imageBehindText ? 'on' : ''}" id="keImgBehind"><span></span></label></div>
-  <div class="keRow"><label>Image</label><input type="file" id="keImage" accept="image/png,image/jpeg" class="keFile"><span style="font-size:10.5px;color:var(--ink3);margin-left:6px">PNG/JPG ≤25MB</span></div>
+  <div class="keRow"><label>Image</label><input type="file" id="keImage" accept="image/png,image/jpeg" class="keFile"></div>
+  <div class="keHint">PNG or JPG &middot; max 25 MB</div>
   ${ov.imageData ? `<div class="keRow"><label></label><img src="${ov.imageData}" class="kePreview"><button id="keRemoveImg" class="keBtn">Remove</button></div>` : ''}
   <div class="keRow" style="margin-top:12px"><button id="keReset" class="keBtn">Reset to default</button></div>
 </div>`;

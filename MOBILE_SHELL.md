@@ -4,8 +4,9 @@
 
 MODKEYS has **two complete, independent layouts** in the same page:
 
-- **Desktop shell** — `<div class="app" id="dShell">` in `index.html`. The
-  three-panel layout. Its CSS lives in `layout.css` + `components.css` and
+- **Desktop shell** — `<div class="app dShell" id="dShell">` in `index.html`
+  (class `dShell` is required — desktop snav CSS is scoped under `.dShell`).
+  The three-panel layout. Its CSS lives in `layout.css` + `components.css` and
   contains **zero responsive `@media` blocks**. Never add any. Desktop is
   desktop.
 - **Mobile shell** — `<template id="mShellTpl">` in the same file. A

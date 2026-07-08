@@ -116,18 +116,27 @@
   background: var(--panel);
 }
 .mShell .mTabs button {
-  flex: 0 0 auto; width: auto; height: 32px; padding: 0 12px;
+  flex: 0 0 auto; width: auto; min-width: 0; height: 32px; padding: 0 12px;
   border-radius: 999px;
-  display: flex; align-items: center; justify-content: center; gap: 5px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
   font-size: 12px; font-weight: 700; color: var(--ink2);
   background: var(--card2, transparent);
   border: 1px solid var(--line);
   touch-action: manipulation;
+  text-align: center;
+  /* Label + meta/dot sit as a centered group inside the pill */
+  line-height: 1;
 }
 .mShell .mTabs button.on { background: var(--card); color: var(--ink); }
-.mShell .mTabs .meta { font-size: 10px; font-weight: 800; color: var(--acc, var(--ink2)); }
+.mShell .mTabs .meta {
+  margin-left: 0;
+  font-size: 10px; font-weight: 800; color: var(--acc, var(--ink2));
+  flex: 0 0 auto;
+}
 .mShell .mTabs .dot {
   width: 6px; height: 6px; border-radius: 50%;
+  margin-left: 0; /* never auto — desktop .snav .dot must not affect pills */
+  flex: 0 0 auto;
   background: var(--acc, #6cf); opacity: 0; transition: opacity 0.2s;
 }
 .mShell .mTabs .dot.on { opacity: 1; }

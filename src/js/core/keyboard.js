@@ -113,7 +113,7 @@ function legendTex(label, wU, fg, mark, opts) {
   const useLabel = (opts.customText !== undefined) ? opts.customText : label;
   const useFg = (opts.customFg !== undefined) ? opts.customFg : fg;
   const useText = useLabel || '';
-  const cacheKey = (useLabel || '') + '|' + wU + '|' + (useFg || 'nofg') + (mark ? '|' + mark : '') + (opts.imageData ? '|img' : '') + (opts.glow ? '|glow' : '') + (opts.imageBehindText ? '|ibt' : '') + '|fs' + (opts.fontSize || '29');
+  const cacheKey = (useLabel || '') + '|' + wU + '|' + (useFg || 'nofg') + (mark ? '|' + mark : '') + (opts.imageData ? '|img' : '') + (opts.glow ? '|glow' : '') + (opts.imageBehindText ? '|ibt' : '') + '|fs' + (opts.fontSize || '29') + (opts.textOverride ? '|to' : '');
   if (!opts.glow && legendCache.has(cacheKey)) return legendCache.get(cacheKey);
   const W = Math.max(128, Math.round(128 * wU)) * S, H = 128 * S;
   const c = document.createElement('canvas');
@@ -135,11 +135,14 @@ function legendTex(label, wU, fg, mark, opts) {
   } else if (opts.glow) {
     renderText(g, useText, '#ffffff', opts.fontSize || 29, W, H, S, pad);
   } else if (useText) {
-    const em = mark && emojiImg[mark];
+    /* A user-set text override beats themed marks/emoji (e.g. the Esc icon):
+       without this, the icon branch below short-circuits renderText and
+       typed text can never appear on marked keys. */
+    const em = !opts.textOverride && mark && emojiImg[mark];
     if (em && em.ready) {
       const sz = Math.min(W, H) * 0.76;
       g.drawImage(em.img, (W - sz) / 2, (H - sz) / 2, sz, sz);
-    } else if (mark && MARKS[mark]) {
+    } else if (!opts.textOverride && mark && MARKS[mark]) {
       MARKS[mark](g, W, H, useFg);
     } else {
       renderText(g, useText, useFg, opts.fontSize || 29, W, H, S, pad);
@@ -326,6 +329,7 @@ function buildOneKey(keyDef, ri, ci, cx, cz, prof, cw, addToGroups) {
       glow,
       imageBehindText: imgBehind,
       fontSize: effectiveFs,
+      textOverride: ((getOverride(id) || {}).customText ?? '') !== '',
     };
     const leg = new THREE.Mesh(
       new THREE.PlaneGeometry(topW, topD),
@@ -467,6 +471,7 @@ export function refreshLegends() {
       glow,
       imageBehindText: imgBehind,
       fontSize: effectiveFs,
+      textOverride: ((getOverride(id) || {}).customText ?? '') !== '',
     };
     c.userData.legend.material.map = legendTex(
       c.userData.label, c.userData.w, cw[c.userData.role].fg, userMark, texOpts,

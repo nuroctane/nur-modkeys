@@ -84,16 +84,22 @@ svg {
   color: var(--sideTx2);
   margin: 26px 6px 10px;
 }
+/* Text-only section nav — one clean vertical column (must use class .dShell
+   on #dShell; id alone does not match .dShell selectors). */
 .dShell .snav {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 2px;
+  width: 100%;
+  flex: 0 0 auto;
 }
 .dShell .snav button {
   display: flex;
   align-items: center;
-  gap: 13px;
-  height: 52px;
+  justify-content: flex-start;
+  gap: 0;
+  height: 46px;
   padding: 0 12px;
   border-radius: 11px;
   color: var(--sideTx);
@@ -103,6 +109,7 @@ svg {
   transition: background 0.18s ease;
   text-align: left;
   width: 100%;
+  flex: 0 0 auto;
 }
 .dShell .snav button:hover {
   background: rgba(255, 255, 255, 0.055);
@@ -110,26 +117,21 @@ svg {
 .dShell .snav button.on {
   background: rgba(255, 255, 255, 0.09);
 }
-.dShell .snav .ic {
-  width: 20px;
-  height: 20px;
-  color: #a9a9b0;
-  flex: 0 0 auto;
-}
-.dShell .snav button.on .ic {
-  color: #fff;
-}
 .dShell .snav .meta {
   margin-left: auto;
   font-size: 13px;
   color: var(--sideTx2);
   font-weight: 600;
 }
-.dot {
+/* Desktop-only: push status dots to the right edge of the row.
+   Global margin-left:auto here used to leak into mobile .mTabs pills and
+   shove labels left of center. */
+.dShell .snav .dot {
   width: 11px;
   height: 11px;
   border-radius: 50%;
   margin-left: auto;
+  flex: 0 0 auto;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
 }
 .sideBottom {
