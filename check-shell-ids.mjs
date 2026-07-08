@@ -17,6 +17,7 @@ const DYNAMIC = new Set([
   'hexAbg','hexAfg','hexMbg','hexMfg','hexXbg','hexXfg',   // custom color inputs (panel render)
   'keGlow','keImgBehind','keSidebarPreview',               // key editor internals (panel render)
   'communityGrid','galleryRetry',                          // gallery modal render
+  'mkAdminOverlay',                                        // books-style admin dialog (runtime body inject)
 ]);
 const DESKTOP_ONLY = new Set(['builds','scrollL','scrollR']); // featured strip; guarded in app.js
 const MOBILE_ONLY = new Set(['mExportToggle','mExportMenu']);  // export sheet; guarded in app.js

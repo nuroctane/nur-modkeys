@@ -632,12 +632,61 @@
   color: var(--ink2);
   margin-top: 2px;
 }
+/* Community gallery admin (desktop SPA) — nuroctane digital-sea chrome */
+.galCardAdmin {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.galCardAdmin .galCard {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.galAdminBar {
+  display: flex;
+  gap: 0;
+  border: 1.5px solid var(--line2);
+  border-top: none;
+  border-radius: 0 0 14px 14px;
+  overflow: hidden;
+  background: rgba(4, 14, 22, 0.92);
+}
+.galAdminBtn {
+  flex: 1;
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 9px 8px;
+  color: #5de8f0;
+  background: rgba(93, 232, 240, 0.04);
+  border: 0;
+  border-right: 1px solid rgba(93, 232, 240, 0.12);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.galAdminBtn:last-child { border-right: 0; }
+.galAdminBtn:hover {
+  background: rgba(93, 232, 240, 0.12);
+  color: #bdeff2;
+}
+.galAdminBtn--danger {
+  color: #e85d5d;
+  background: rgba(232, 93, 93, 0.04);
+}
+.galAdminBtn--danger:hover {
+  background: rgba(232, 93, 93, 0.12);
+  color: #ff8a8a;
+}
 .secTitle {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.13em;
   color: var(--ink2);
   margin: 18px 0 10px;
+}
+.secTitle .bs-admin-badge {
+  vertical-align: middle;
 }
 .toast {
   position: fixed;

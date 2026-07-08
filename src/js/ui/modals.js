@@ -6,6 +6,18 @@ import { CASES, FINISHES, PLATES, SWITCHES, MATERIALS, EXTRAS, PROFILES, LIGHT_C
 import { PRESETS } from '../data/presets.js';
 import { toast } from './toast.js';
 import { playKeyClick } from './sound.js';
+import {
+  getAdminState,
+  promptAdminPassword,
+  promptRename,
+  promptDeleteConfirm,
+  adminRenameBuild,
+  adminDeleteBuild,
+  invalidateGalleryCache,
+  publishAdminState,
+  esc,
+  isDesktop,
+} from './galleryAdmin.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -59,21 +71,34 @@ function thumbnailOrGradient(src, snap) {
   return `<div class="img" style="background:linear-gradient(135deg,${cwGuess[0]} 50%,${cwGuess[1]} 50%)"></div>`;
 }
 
+function communityCardHtml(t, thumbs, admin) {
+  const card = `<button type="button" class="galCard" data-community="${esc(t.id)}">${thumbnailOrGradient(thumbs[t.id], t.snap)}<div class="cap"><div class="nm">${esc(t.name)}</div><div class="tg">${esc(t.layout || '')}</div></div></button>`;
+  if (!admin) return card;
+  return `<div class="galCardAdmin" data-community-wrap="${esc(t.id)}">
+    ${card}
+    <div class="galAdminBar">
+      <button type="button" class="galAdminBtn" data-gal-rename="${esc(t.id)}">RENAME</button>
+      <button type="button" class="galAdminBtn galAdminBtn--danger" data-gal-delete="${esc(t.id)}">DELETE</button>
+    </div>
+  </div>`;
+}
+
 export function openGallery() {
   syncNav('gallery');
   const { savedBuilds, thumbs } = window.__MODKEYS__ || { savedBuilds: [], thumbs: {} };
+  const { isAdmin } = getAdminState();
   let html = '<div class="secTitle">FEATURED</div><div class="galGrid">' +
     PRESETS.map((p) =>
       `<button class="galCard" data-gal="${p.id}">${thumbnailOrGradient(thumbs[p.id], p.s)}
-        <div class="cap"><div class="nm">${p.name}</div><div class="tg">${cwName(p.s)}</div></div></button>`,
+        <div class="cap"><div class="nm">${esc(p.name)}</div><div class="tg">${esc(cwName(p.s))}</div></div></button>`,
     ).join('') + '</div>';
-  html += '<div class="secTitle">COMMUNITY</div><div class="galGrid" id="communityGrid">' +
+  html += `<div class="secTitle">COMMUNITY${isAdmin ? ' <span class="bs-admin-badge">ADMIN</span>' : ''}</div><div class="galGrid" id="communityGrid">` +
     '<div class="hint" style="grid-column:1/-1">Loading community builds...</div></div>';
   if (savedBuilds.length) {
     html += '<div class="secTitle">YOUR BUILDS</div><div class="galGrid">' +
       savedBuilds.map((b, i) =>
         `<button class="galCard" data-saved="${i}">${thumbnailOrGradient(b.img, b.snap)}
-          <div class="cap"><div class="nm">${b.name}</div><div class="tg">${cwName(b.snap)}</div></div></button>`,
+          <div class="cap"><div class="nm">${esc(b.name)}</div><div class="tg">${esc(cwName(b.snap))}</div></div></button>`,
       ).join('') + '</div>';
   } else {
     html += '<div class="secTitle">YOUR BUILDS</div><div class="hint" style="margin-bottom:16px">No saved builds yet. Use <strong>Save Build</strong> in the sidebar to save your first one.</div>';
@@ -97,10 +122,9 @@ export function openGallery() {
         grid.innerHTML = '<div class="hint" style="grid-column:1/-1">No community builds yet. Be the first — hit <strong>Save Build</strong>.</div>';
         return;
       }
-      const { thumbs } = window.__MODKEYS__ || { thumbs: {} };
-      grid.innerHTML = community.map((t) =>
-        `<button class="galCard" data-community="${t.id}">${thumbnailOrGradient(thumbs[t.id], t.snap)}<div class="cap"><div class="nm">${t.name}</div><div class="tg">${t.layout || ''}</div></div></button>`,
-      ).join('');
+      const { thumbs: th } = window.__MODKEYS__ || { thumbs: {} };
+      const admin = getAdminState().isAdmin;
+      grid.innerHTML = community.map((t) => communityCardHtml(t, th, admin)).join('');
     }).catch(() => {
       const grid = document.getElementById('communityGrid');
       if (!grid) return;
@@ -137,8 +161,69 @@ export function openAccessories() {
   );
 }
 
+async function handleCommunityRename(id) {
+  const { galleryCache } = window.__MODKEYS__ || { galleryCache: [] };
+  const t = (galleryCache || []).find((e) => e.id === id);
+  if (!t) return;
+  let { isAdmin, password } = getAdminState();
+  if (!isAdmin || !password) {
+    const pw = await promptAdminPassword();
+    if (!pw) return;
+    password = pw;
+    isAdmin = true;
+  }
+  const name = await promptRename(t.name);
+  if (!name) return;
+  try {
+    await adminRenameBuild(id, name);
+    invalidateGalleryCache();
+    toast('Renamed to “' + name + '”');
+    openGallery();
+  } catch (err) {
+    toast(err.message || 'Rename failed');
+  }
+}
+
+async function handleCommunityDelete(id) {
+  const { galleryCache } = window.__MODKEYS__ || { galleryCache: [] };
+  const t = (galleryCache || []).find((e) => e.id === id);
+  if (!t) return;
+  let { isAdmin, password } = getAdminState();
+  if (!isAdmin || !password) {
+    const pw = await promptAdminPassword();
+    if (!pw) return;
+    password = pw;
+    isAdmin = true;
+  }
+  const ok = await promptDeleteConfirm(t.name);
+  if (!ok) return;
+  try {
+    await adminDeleteBuild(id);
+    invalidateGalleryCache();
+    toast('Deleted “' + t.name + '”');
+    openGallery();
+  } catch (err) {
+    toast(err.message || 'Delete failed');
+  }
+}
+
 /* modal body event delegation */
-$('modalBody').addEventListener('click', (ev) => {
+$('modalBody')?.addEventListener('click', (ev) => {
+  const renameBtn = ev.target.closest('[data-gal-rename]');
+  if (renameBtn) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    handleCommunityRename(renameBtn.dataset.galRename);
+    return;
+  }
+  const deleteBtn = ev.target.closest('[data-gal-delete]');
+  if (deleteBtn) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    handleCommunityDelete(deleteBtn.dataset.galDelete);
+    return;
+  }
+
   const lib = ev.target.closest('[data-lib]');
   if (lib) {
     setState({ colorway: lib.dataset.lib, selectedPreset: null });
@@ -195,7 +280,7 @@ $('modalBody').addEventListener('click', (ev) => {
 });
 
 /* top nav event delegation for modals */
-$('tnav').addEventListener('click', (ev) => {
+$('tnav')?.addEventListener('click', (ev) => {
   const b = ev.target.closest('button');
   if (!b) return;
   const id = b.dataset.nav;
@@ -206,8 +291,45 @@ $('tnav').addEventListener('click', (ev) => {
   if (id === 'accessories') openAccessories();
 });
 
-$('modalClose').addEventListener('click', closeModal);
-$('modalBack').addEventListener('click', closeModal);
+$('modalClose')?.addEventListener('click', closeModal);
+$('modalBack')?.addEventListener('click', closeModal);
 document.addEventListener('keydown', (ev) => {
-  if (ev.key === 'Escape') closeModal();
+  if (ev.key === 'Escape') {
+    if (document.getElementById('mkAdminOverlay')) return; /* overlay handles its own esc */
+    closeModal();
+  }
+});
+
+/* Desktop: Ctrl+Shift+A toggles community gallery admin (same chord as /books). */
+document.addEventListener('keydown', async (ev) => {
+  if (!isDesktop()) return;
+  if (!(ev.ctrlKey && ev.shiftKey && (ev.code === 'KeyA' || ev.key === 'A' || ev.key === 'a'))) return;
+  /* Don't steal when typing in fields */
+  const tag = (ev.target && ev.target.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  ev.preventDefault();
+  const { isAdmin } = getAdminState();
+  if (isAdmin) {
+    publishAdminState({ isAdmin: false, password: '' });
+    toast('Admin mode off');
+    if ($('modal')?.classList.contains('open') && $('modalTitle')?.textContent === 'Gallery') {
+      openGallery();
+    }
+    window.dispatchEvent(new CustomEvent('modkeys-admin-ui', { detail: { isAdmin: false } }));
+    return;
+  }
+  const pw = await promptAdminPassword();
+  if (pw) {
+    toast('Admin mode on — community gallery unlocked');
+    if ($('modal')?.classList.contains('open') && $('modalTitle')?.textContent === 'Gallery') {
+      openGallery();
+    }
+    window.dispatchEvent(new CustomEvent('modkeys-admin-ui', { detail: { isAdmin: true } }));
+  }
+});
+
+window.addEventListener('modkeys-admin-change', () => {
+  if ($('modal')?.classList.contains('open') && $('modalTitle')?.textContent === 'Gallery') {
+    openGallery();
+  }
 });
