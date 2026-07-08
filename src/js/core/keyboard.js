@@ -113,13 +113,27 @@ function legendTex(label, wU, fg, mark, opts) {
   const useLabel = (opts.customText !== undefined) ? opts.customText : label;
   const useFg = (opts.customFg !== undefined) ? opts.customFg : fg;
   const useText = useLabel || '';
-  const cacheKey = (useLabel || '') + '|' + wU + '|' + (useFg || 'nofg') + (mark ? '|' + mark : '') + (opts.imageData ? '|img' : '') + (opts.glow ? '|glow' : '') + (opts.imageBehindText ? '|ibt' : '') + '|fs' + (opts.fontSize || '29') + (opts.textOverride ? '|to' : '');
-  if (!opts.glow && legendCache.has(cacheKey)) return legendCache.get(cacheKey);
+  const fs = Number(opts.fontSize);
+  const fontSize = Number.isFinite(fs) ? fs : 29;
+  /* liveEdit: skip cache read so slider drags always paint a fresh atlas
+     (avoids stale GPU-bound CanvasTextures on desktop rebuild paths). */
+  const cacheKey = (useLabel || '') + '|' + wU + '|' + (useFg || 'nofg')
+    + (mark ? '|' + mark : '')
+    + (opts.imageData ? '|img' : '')
+    + (opts.glow ? '|glow' : '')
+    + (opts.imageBehindText ? '|ibt' : '')
+    + '|fs' + fontSize
+    + (opts.textOverride ? '|to' : '');
+  if (!opts.glow && !opts.liveEdit && legendCache.has(cacheKey)) {
+    const hit = legendCache.get(cacheKey);
+    if (hit && hit.image) return hit;
+  }
   const W = Math.max(128, Math.round(128 * wU)) * S, H = 128 * S;
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
   const g = c.getContext('2d');
   const pad = 17 * S;
+  const markScale = fontSize / 29;
 
   if (opts.imageData) {
     const img = new Image();
@@ -130,28 +144,34 @@ function legendTex(label, wU, fg, mark, opts) {
     const dw = iw * scale, dh = ih * scale;
     g.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
     if (opts.imageBehindText && useText) {
-      renderText(g, useText, useFg, opts.fontSize || 29, W, H, S, pad);
+      renderText(g, useText, useFg, fontSize, W, H, S, pad);
     }
   } else if (opts.glow) {
-    renderText(g, useText, '#ffffff', opts.fontSize || 29, W, H, S, pad);
+    renderText(g, useText, '#ffffff', fontSize, W, H, S, pad);
   } else if (useText) {
     /* A user-set text override beats themed marks/emoji (e.g. the Esc icon):
        without this, the icon branch below short-circuits renderText and
        typed text can never appear on marked keys. */
     const em = !opts.textOverride && mark && emojiImg[mark];
     if (em && em.ready) {
-      const sz = Math.min(W, H) * 0.76;
+      const sz = Math.min(W, H) * 0.76 * markScale;
       g.drawImage(em.img, (W - sz) / 2, (H - sz) / 2, sz, sz);
     } else if (!opts.textOverride && mark && MARKS[mark]) {
+      g.save();
+      g.translate(W / 2, H / 2);
+      g.scale(markScale, markScale);
+      g.translate(-W / 2, -H / 2);
       MARKS[mark](g, W, H, useFg);
+      g.restore();
     } else {
-      renderText(g, useText, useFg, opts.fontSize || 29, W, H, S, pad);
+      renderText(g, useText, useFg, fontSize, W, H, S, pad);
     }
   }
   const t = new THREE.CanvasTexture(c);
   t.anisotropy = renderer.capabilities.getMaxAnisotropy();
   t.colorSpace = THREE.SRGBColorSpace;
-  if (!opts.glow) legendCacheSet(cacheKey, t);
+  t.needsUpdate = true;
+  if (!opts.glow && !opts.liveEdit) legendCacheSet(cacheKey, t);
   return t;
 }
 
@@ -439,6 +459,90 @@ export function rebuildKey(ri, ci) {
   glow.renderOrder = 1;
   glow.userData.keepGeo = true;
   keyGlowGroup.add(glow);
+}
+
+/**
+ * Live legend update for key-editor fields (font size / text / fg / glow / image).
+ * Prefer in-place map swap over full mesh rebuild so desktop slider drags
+ * always re-upload a fresh CanvasTexture to the GPU.
+ */
+export function updateKeyLegend(id) {
+  if (!id) return;
+  const mesh = capsGroup.children.find((c) => c.userData.perKeyId === id);
+  if (!mesh) {
+    const parts = id.split('-').map(Number);
+    if (parts.length === 2 && parts.every(Number.isFinite)) rebuildKey(parts[0], parts[1]);
+    return;
+  }
+  /* BG color clones the keycap material — needs full rebuild */
+  const ov = getOverride(id);
+  if (ov && ov.bgColor) {
+    const parts = id.split('-').map(Number);
+    if (parts.length === 2 && parts.every(Number.isFinite)) rebuildKey(parts[0], parts[1]);
+    return;
+  }
+  if (!mesh.userData.legend) {
+    const parts = id.split('-').map(Number);
+    if (parts.length === 2 && parts.every(Number.isFinite)) rebuildKey(parts[0], parts[1]);
+    return;
+  }
+
+  const cw = effectiveColorway();
+  const role = mesh.userData.role;
+  const effectiveLabel = getEffectiveText(id, mesh.userData.label);
+  const effectiveFg = getEffectiveFg(id, cw[role].fg);
+  const effectiveMark = getEffectiveMark(id, markFor(mesh.userData.label));
+  const userMark = hasCustomText(id) ? null : effectiveMark;
+  const effectiveImage = getEffectiveImage(id);
+  const effectiveFs = getEffectiveFontSize(id, 29);
+  const glow = hasGlow(id);
+  const imgBehind = hasImageBehindText(id);
+  const texOpts = {
+    customText: effectiveLabel,
+    customFg: effectiveFg,
+    imageData: effectiveImage,
+    glow,
+    imageBehindText: imgBehind,
+    fontSize: effectiveFs,
+    textOverride: ((ov || {}).customText ?? '') !== '',
+    liveEdit: true,
+  };
+
+  const newMap = legendTex(
+    mesh.userData.label, mesh.userData.w, cw[role].fg, userMark, texOpts,
+  );
+  const mat = mesh.userData.legend.material;
+  const prev = mat.map;
+  mat.map = newMap;
+  mat.needsUpdate = true;
+  if (newMap) newMap.needsUpdate = true;
+  /* prev may be a shared cache entry — only dispose liveEdit (uncached) maps */
+  if (prev && prev !== newMap && prev.userData && prev.userData.liveEdit) {
+    prev.dispose();
+  }
+  if (newMap) newMap.userData = { liveEdit: true };
+
+  if (glow) {
+    const maskOpts = Object.assign({}, texOpts, { glow: true, liveEdit: true });
+    const maskTex = legendTex(mesh.userData.label, mesh.userData.w, '#ffffff', userMark, maskOpts);
+    if (!mesh.userData.glowLegend) {
+      const topW = (mesh.userData.w - GAP) * PROFILES[state.profile].taper * 0.92;
+      const topD = (1 - GAP) * PROFILES[state.profile].taper * 0.82;
+      const glowMat = createLegendGlowMat();
+      glowMat.uniforms.uMask.value = maskTex;
+      const glowLeg = new THREE.Mesh(new THREE.PlaneGeometry(topW, topD), glowMat);
+      glowLeg.rotation.x = -Math.PI / 2;
+      glowLeg.position.y = PROFILES[state.profile].h + 0.056;
+      glowLeg.renderOrder = 3;
+      mesh.add(glowLeg);
+      mesh.userData.glowLegend = glowLeg;
+    } else {
+      mesh.userData.glowLegend.material.uniforms.uMask.value = maskTex;
+    }
+  } else if (mesh.userData.glowLegend) {
+    mesh.remove(mesh.userData.glowLegend);
+    mesh.userData.glowLegend = null;
+  }
 }
 
 export function getKeyLabel(id) {

@@ -47,13 +47,24 @@ export function renderText(g, text, fg, fs, W, H, S, pad) {
   const F = '"Inter","Segoe UI",Arial,sans-serif';
   g.fillStyle = fg || '#000000';
   g.textBaseline = 'top';
-  const lines = text.split('\n');
+  const base = (Number(fs) || 29) * S;
+  const lines = String(text).split('\n');
   if (lines.length === 2) {
-    g.font = '700 ' + 27 * S + 'px ' + F;
+    /* Two-line legends used a hard-coded 27px and ignored the slider — fix. */
+    let fontSize = Math.max(15 * S, base * 0.93);
+    g.font = '700 ' + fontSize + 'px ' + F;
+    const maxW = W - pad * 2;
+    while (
+      (g.measureText(lines[0]).width > maxW || g.measureText(lines[1]).width > maxW)
+      && fontSize > 15 * S
+    ) {
+      fontSize--;
+      g.font = '700 ' + fontSize + 'px ' + F;
+    }
     g.fillText(lines[0], pad, pad);
-    g.fillText(lines[1], pad, pad + 44 * S);
+    g.fillText(lines[1], pad, pad + fontSize + 4 * S);
   } else {
-    let fontSize = fs * S;
+    let fontSize = base;
     g.font = '700 ' + fontSize + 'px ' + F;
     while (g.measureText(text).width > W - pad * 2 && fontSize > 15 * S) {
       fontSize--;

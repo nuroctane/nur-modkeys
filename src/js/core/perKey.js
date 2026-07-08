@@ -60,7 +60,9 @@ export function getEffectiveImage(id) {
 
 export function getEffectiveFontSize(id, defaultSize) {
   const o = store()[id];
-  return (o && o.fontSize) ? o.fontSize : defaultSize;
+  if (!o || o.fontSize == null || o.fontSize === '') return defaultSize;
+  const n = Number(o.fontSize);
+  return Number.isFinite(n) ? n : defaultSize;
 }
 
 export function hasGlow(id) {

@@ -6,10 +6,21 @@ import { setState, effectiveColorway } from '../core/update.js';
 import { setOverride, clearOverride, getOverride } from '../core/perKey.js';
 import { loadImage, validateImageFile } from '../core/imageLoader.js';
 import { MARKS } from '../data/art.js';
-import { rebuildKey, getKeyLabel } from '../core/keyboard.js';
+import { rebuildKey, getKeyLabel, updateKeyLegend } from '../core/keyboard.js';
 import { toast } from './toast.js';
 
 const $ = (id) => document.getElementById(id);
+
+/** Apply a key-editor field patch and refresh the 3D legend immediately. */
+function applyKeyEditorPatch(patch, { fullRebuild = false } = {}) {
+  if (!_currentEditId) return;
+  setOverride(_currentEditId, patch);
+  if (fullRebuild) {
+    rebuildKey(..._currentEditId.split('-').map(Number));
+  } else {
+    updateKeyLegend(_currentEditId);
+  }
+}
 
 export function lightDotStyle() {
   if (state.light.mode === 'off') return 'background:#3f3f45';
@@ -216,6 +227,25 @@ export function showKeyEditor(keyData) {
   pop.classList.add('open');
   $('panelBody').classList.add('keOpen');
   updateSidebarKeyImage();
+
+  /* Direct bindings so font-size / text / color always fire after each
+     showKeyEditor() re-render (innerHTML replaces nodes). stopPropagation
+     avoids the delegated #keyEditor listener applying the patch twice. */
+  const bind = (elId, handler) => {
+    const el = $(elId);
+    if (!el) return;
+    el.addEventListener('input', (ev) => {
+      ev.stopPropagation();
+      handler(ev);
+    });
+  };
+  bind('keText', (ev) => applyKeyEditorPatch({ customText: ev.target.value || '' }));
+  bind('keFs', (ev) => {
+    const n = parseInt(ev.target.value, 10);
+    applyKeyEditorPatch({ fontSize: Number.isFinite(n) ? n : 29 });
+  });
+  bind('keFg', (ev) => applyKeyEditorPatch({ fgColor: ev.target.value }));
+  bind('keBg', (ev) => applyKeyEditorPatch({ bgColor: ev.target.value }, { fullRebuild: true }));
 }
 
 export function hideKeyEditor() {
@@ -323,14 +353,15 @@ export function setupPanelEvents() {
   ke.addEventListener('input', (ev) => {
     if (!_currentEditId) return;
     const id = ev.target.id;
-    if (id === 'keText' || id === 'keFs' || id === 'keFg' || id === 'keBg') {
-      const patch = {};
-      if (id === 'keText') patch.customText = ev.target.value || '';
-      if (id === 'keFs') patch.fontSize = parseInt(ev.target.value);
-      if (id === 'keFg') patch.fgColor = ev.target.value;
-      if (id === 'keBg') patch.bgColor = ev.target.value;
-      setOverride(_currentEditId, patch);
-      rebuildKey(..._currentEditId.split('-').map(Number));
+    if (id === 'keText') {
+      applyKeyEditorPatch({ customText: ev.target.value || '' });
+    } else if (id === 'keFs') {
+      const n = parseInt(ev.target.value, 10);
+      applyKeyEditorPatch({ fontSize: Number.isFinite(n) ? n : 29 });
+    } else if (id === 'keFg') {
+      applyKeyEditorPatch({ fgColor: ev.target.value });
+    } else if (id === 'keBg') {
+      applyKeyEditorPatch({ bgColor: ev.target.value }, { fullRebuild: true });
     }
   });
   ke.addEventListener('change', async (ev) => {
