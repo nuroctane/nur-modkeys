@@ -1,8 +1,8 @@
 import { state } from '../core/state.js';
 import { LAYOUTS } from '../data/layouts.js';
-import { COLORWAYS } from '../data/colorways.js';
 import { effectiveColorway } from '../core/update.js';
-import { getEffectiveText, getEffectiveFg, getEffectiveBg, getOverride, keyId } from '../core/perKey.js';
+import { getEffectiveText, getEffectiveFg, getEffectiveBg, getEffectiveFontSize, getOverride, keyId } from '../core/perKey.js';
+import { exportKLE } from './kle.js';
 
 function escapeXml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -36,10 +36,13 @@ export function generateSVG() {
   const svgW = maxW * UNIT + PAD * 2;
   const svgH = totalH * UNIT + PAD * 2;
 
-  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}">
+  const kleJson = exportKLE();
+
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}mm" height="${svgH}mm" viewBox="0 0 ${svgW} ${svgH}">
+<metadata><![CDATA[${kleJson.replaceAll(']]>', ']]]]><![CDATA[>')}]]></metadata>
 <rect width="${svgW}" height="${svgH}" fill="#ffffff"/>
 <style>
-  text { font-family: "Inter","Segoe UI",Arial,sans-serif; font-weight: 600; fill: #000; }
+  text { font-family: Inter, Arial, sans-serif; font-weight: 600; fill: #000; }
   .k { stroke: #ccc; stroke-width: 0.3; }
 </style>
 <g transform="translate(${PAD},${PAD})">`;
@@ -55,8 +58,10 @@ export function generateSVG() {
       const h = KEY_H;
       const id = keyId(ri, ci);
       const ov = getOverride(id);
-      const bg = (ov && ov.bgColor) ? ov.bgColor : (colorMap[k.r] || colorMap.a);
-      const fg = (ov && ov.fgColor) ? ov.fgColor : (fgColorMap[k.r] || fgColorMap.a);
+      const defaultBg = colorMap[k.r] || colorMap.a;
+      const defaultFg = fgColorMap[k.r] || fgColorMap.a;
+      const bg = getEffectiveBg(id, defaultBg);
+      const fg = getEffectiveFg(id, defaultFg) || defaultFg;
 
       svg += `<rect class="k" x="${x}" y="${y}" width="${w}" height="${h}" rx="${K_R}" fill="${bg}" />`;
       const effectiveLabel = getEffectiveText(id, k.l);

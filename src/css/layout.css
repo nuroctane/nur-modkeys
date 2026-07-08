@@ -48,6 +48,7 @@ svg {
   display: grid;
   grid-template-columns: 264px 1fr;
   height: 100vh;
+  height: 100dvh; /* mobile URL-bar-safe viewport */
   min-width: 820px;
 }
 
@@ -83,12 +84,12 @@ svg {
   color: var(--sideTx2);
   margin: 26px 6px 10px;
 }
-.snav {
+.dShell .snav {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
-.snav button {
+.dShell .snav button {
   display: flex;
   align-items: center;
   gap: 13px;
@@ -103,22 +104,22 @@ svg {
   text-align: left;
   width: 100%;
 }
-.snav button:hover {
+.dShell .snav button:hover {
   background: rgba(255, 255, 255, 0.055);
 }
-.snav button.on {
+.dShell .snav button.on {
   background: rgba(255, 255, 255, 0.09);
 }
-.snav .ic {
+.dShell .snav .ic {
   width: 20px;
   height: 20px;
   color: #a9a9b0;
   flex: 0 0 auto;
 }
-.snav button.on .ic {
+.dShell .snav button.on .ic {
   color: #fff;
 }
-.snav .meta {
+.dShell .snav .meta {
   margin-left: auto;
   font-size: 13px;
   color: var(--sideTx2);
@@ -278,56 +279,3 @@ svg {
 }
 
 /* ---------- responsive ---------- */
-@media (max-width: 1024px) {
-  .app { grid-template-columns: 72px 1fr; min-width: 0; }
-  .logo b, .sideLabel, .snav .meta, .sideBottom { display: none; }
-  .snav button { justify-content: center; padding: 0 4px; gap: 0; flex-direction: column; height: 56px; font-size: 9px; letter-spacing: 0; }
-  .snav .ic { width: 18px; height: 18px; }
-  .dot { width: 8px; height: 8px; }
-  .side { padding: 0 6px 10px; }
-  .topbar { padding: 0 14px; }
-  .tnav { gap: 14px; }
-  .content { grid-template-columns: 1fr 240px; gap: 0 14px; padding: 0 14px 14px; }
-  .rpanel { margin: 12px 0 4px; }
-  .rpHead { padding: 16px 16px 12px; }
-  .rpBody { padding: 14px 16px 18px; }
-}
-
-@media (max-width: 768px) {
-  .app { grid-template-columns: 1fr; min-width: 0; }
-  .side {
-    position: fixed; bottom: 0; left: 0; right: 0; width: 100%; height: auto;
-    flex-direction: row; padding: 0; z-index: 50;
-    border-radius: 14px 14px 0 0; border-top: 1px solid rgba(255,255,255,0.08);
-  }
-  .logo, .sideLabel, .sideBottom { display: none !important; }
-  .snav { flex-direction: row; overflow-x: auto; width: 100%; gap: 0; }
-  .snav button { flex: 1 0 auto; min-width: 48px; height: 52px; padding: 4px 4px; gap: 1px; }
-  .snav button .meta { display: none; }
-  .snav .ic { display: block; }
-  .main { padding-bottom: 56px; height: 100vh; overflow-y: auto; }
-  .topbar { height: 56px; padding: 0 10px; overflow-x: auto; }
-  .topbar::-webkit-scrollbar { display: none; }
-  .tnav { gap: 0; }
-  .tnav button { font-size: 12px; padding: 0 10px; white-space: nowrap; }
-  .tnav button.on::after { bottom: 12px; }
-  .content { grid-template-columns: 1fr; grid-template-rows: auto auto; gap: 0; padding: 0 0 14px; }
-  .stageCol { grid-row: 1; grid-column: 1; height: 340px; }
-  .stage { position: absolute; inset: 0; }
-  .rpanel { grid-row: 2; grid-column: 1; margin: 12px; border-radius: 16px; }
-  .rpHead { padding: 14px 14px 10px; }
-  .rpHead h2 { font-size: 11px; }
-  .rpBody { padding: 10px 14px 14px; }
-  .featured { padding: 10px 14px 0; }
-  .fhead h3 { font-size: 10px; }
-}
-
-@media (max-width: 420px) {
-  .stageCol { height: 260px; }
-  .snav button { min-width: 42px; height: 44px; }
-  .main { padding-bottom: 48px; }
-  .rpanel { margin: 8px; }
-  .featured { padding: 6px 10px 0; }
-  .bcard { flex: 0 0 140px; }
-  .bcard .img { height: 80px; }
-}

@@ -4,13 +4,13 @@ import { renderer, scene, camera, root, caseGroup, capsGroup, knobGroup, uni } f
 import { plateMesh } from './keyboard.js';
 import { state } from './state.js';
 import { SWITCHES } from '../data/components.js';
-import { playSwitch } from '../ui/sound.js';
+import { playKeyClick } from '../ui/sound.js';
 
 let onKeyEdit = null;
 export function onKeyEditClick(fn) { onKeyEdit = fn; }
 
-const canvas = document.getElementById('gl');
-const stage = document.getElementById('stage');
+const getCanvas = () => document.getElementById('gl');
+const getStage = () => document.getElementById('stage');
 
 /* camera rig with inertia */
 export const ctrl = {
@@ -122,7 +122,7 @@ let pointers = new Map(), dragMode = null,
   pinchD = 0, hoverCap = null;
 
 function pick(list, ev) {
-  const r = canvas.getBoundingClientRect();
+  const r = getCanvas().getBoundingClientRect();
   ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
   ray.setFromCamera(ndc, camera);
   const hits = ray.intersectObjects(list, true);
@@ -134,8 +134,8 @@ function capOf(o) {
   return o;
 }
 
-canvas.addEventListener('pointerdown', (ev) => {
-  canvas.setPointerCapture(ev.pointerId);
+getCanvas().addEventListener('pointerdown', (ev) => {
+  getCanvas().setPointerCapture(ev.pointerId);
   pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
   lastX = downX = ev.clientX;
   lastY = downY = ev.clientY;
@@ -148,10 +148,10 @@ canvas.addEventListener('pointerdown', (ev) => {
   const hitKnob = pick(knobGroup.visible ? knobGroup.children : [], ev);
   if (hitKnob) { dragMode = 'knob'; return; }
   dragMode = state.tool === 'pan' || ev.button === 1 || ev.button === 2 || ev.shiftKey ? 'pan' : 'orbit';
-  stage.classList.add('grabbing');
+  getStage().classList.add('grabbing');
 });
 
-canvas.addEventListener('pointermove', (ev) => {
+getCanvas().addEventListener('pointermove', (ev) => {
   if (pointers.has(ev.pointerId))
     pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
   const dx = ev.clientX - lastX, dy = ev.clientY - lastY;
@@ -188,7 +188,7 @@ canvas.addEventListener('pointermove', (ev) => {
   }
   const overKnob = knobGroup.visible && pick(knobGroup.children, ev);
   const hit = overKnob ? null : capOf(pick(capsGroup.children, ev));
-  canvas.style.cursor = overKnob ? 'ew-resize' : hit ? 'pointer' : '';
+  getCanvas().style.cursor = overKnob ? 'ew-resize' : hit ? 'pointer' : '';
   if (hit !== hoverCap) {
     if (hoverCap && !state.exploded) {
       if (RM()) hoverCap.position.y = hoverCap.userData.baseY;
@@ -205,7 +205,7 @@ canvas.addEventListener('pointermove', (ev) => {
 let lastClickKey = null, lastClickTime = 0;
 function endPointer(ev) {
   pointers.delete(ev.pointerId);
-  stage.classList.remove('grabbing');
+  getStage().classList.remove('grabbing');
   const moved = Math.hypot(ev.clientX - downX, ev.clientY - downY);
   if (dragMode === 'orbit' && moved < 5) {
     const hit = capOf(pick(capsGroup.children, ev));
@@ -220,7 +220,7 @@ function endPointer(ev) {
       }
       lastClickKey = hit;
       lastClickTime = now;
-      playSwitch(SWITCHES[state.sw].sound);
+      playKeyClick(SWITCHES[state.sw].sound, state.material);
       if (RM()) {
         hit.position.y = hit.userData.baseY + 0.055;
       } else {
@@ -232,10 +232,10 @@ function endPointer(ev) {
   }
   dragMode = null;
 }
-canvas.addEventListener('pointerup', endPointer);
-canvas.addEventListener('pointercancel', endPointer);
-canvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
-canvas.addEventListener('wheel', (ev) => {
+getCanvas().addEventListener('pointerup', endPointer);
+getCanvas().addEventListener('pointercancel', endPointer);
+getCanvas().addEventListener('contextmenu', (ev) => ev.preventDefault());
+getCanvas().addEventListener('wheel', (ev) => {
   ev.preventDefault();
   ctrl.radius *= 1 + ev.deltaY * 0.0011;
 }, { passive: false });

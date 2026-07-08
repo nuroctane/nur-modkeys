@@ -1,62 +1,135 @@
 import { state } from '../core/state.js';
 import { LAYOUTS } from '../data/layouts.js';
-import { COLORWAYS } from '../data/colorways.js';
-import { SWITCHES } from '../data/components.js';
+import { PROFILES } from '../data/components.js';
 import { effectiveColorway } from '../core/update.js';
-import { getEffectiveText, getEffectiveFg, getEffectiveBg, getOverride, keyId } from '../core/perKey.js';
+import { getEffectiveText, getEffectiveFg, getEffectiveBg, getEffectiveFontSize, getOverride, keyId } from '../core/perKey.js';
+
+const KLE_PROFILES = {
+  cherry: 'Cherry',
+  oem: 'OEM',
+  xda: 'XDA',
+  sa: 'SA',
+  dsa: 'DSA',
+  mt3: 'MT3',
+  asa: 'ASA',
+};
 
 export function exportKLE() {
   const L = LAYOUTS[state.layout];
   const rows = L.rows();
   const cw = effectiveColorway();
-  const colorMap = { a: cw.a.bg, m: cw.m.bg, x: cw.x.bg };
+  const profileName = KLE_PROFILES[state.profile] || state.profile;
+  const cwName = state.customColors ? 'Custom' : (cw?.name || 'Custom');
 
-  const kleData = [
-    {
-      name: `MODKEYS ${L.pct} — ${state.customColors ? 'Custom' : COLORWAYS[state.colorway].name}`,
-      author: 'MODKEYS Configurator',
-      switchMount: 'cherry',
-      switchBrand: 'cherry',
-      switchType: SWITCHES[state.sw].name,
-    },
-  ];
+  const meta = {
+    name: `MODKEYS ${L.pct} — ${cwName}`,
+    author: 'MODKEYS Configurator',
+    notes: `Switch: ${state.sw} | Plate: ${state.plate} | Case: ${state.caseColor} | Profile: ${profileName}`,
+  };
+
+  const kleData = [meta];
 
   rows.forEach((row, ri) => {
     const kleRow = [];
-    let cur = 0;
-    row.forEach((keyDef, ci) => {
-      const start = keyDef.x !== undefined ? keyDef.x : cur;
-      if (start > cur) {
-        kleRow.push({ x: start - cur });
+    let curX = 0;
+    let currentProps = {};
+
+    function emitProps(nextProps) {
+      const changed = {};
+      let hasChange = false;
+      if (nextProps.c !== undefined && nextProps.c !== currentProps.c) {
+        changed.c = nextProps.c; hasChange = true;
       }
+      if (nextProps.t !== undefined && nextProps.t !== currentProps.t) {
+        changed.t = nextProps.t; hasChange = true;
+      }
+      if (nextProps.f !== undefined && nextProps.f !== currentProps.f) {
+        changed.f = nextProps.f; hasChange = true;
+      }
+      if (nextProps.x !== undefined) {
+        changed.x = nextProps.x; hasChange = true;
+      }
+      if (nextProps.w !== undefined) {
+        changed.w = nextProps.w; hasChange = true;
+      }
+      if (nextProps.n !== undefined) {
+        changed.n = nextProps.n; hasChange = true;
+      }
+      if (hasChange) {
+        kleRow.push(changed);
+        Object.assign(currentProps, changed);
+      }
+      return changed;
+    }
+
+    row.forEach((keyDef, ci) => {
+      const start = keyDef.x !== undefined ? keyDef.x : curX;
       const id = keyId(ri, ci);
       const ov = getOverride(id);
-      const customBg = (ov && ov.bgColor) ? ov.bgColor : null;
-      const entry = {
-        x: 0,
-        y: 0,
-        w: keyDef.w || 1,
-        h: 1,
-        c: customBg || colorMap[keyDef.r] || colorMap.a,
-        t: '#000000',
-      };
+      const defaultBg = cw[keyDef.r]?.bg || cw.a?.bg || '#cccccc';
+      const defaultFg = cw[keyDef.r]?.fg || cw.a?.fg || '#000000';
+      const bgColor = getEffectiveBg(id, defaultBg);
+      const fgColor = getEffectiveFg(id, defaultFg) || defaultFg;
       const effectiveLabel = getEffectiveText(id, keyDef.l);
-      if (effectiveLabel) {
-        entry.l = effectiveLabel;
-      }
-      if (ov) {
-        entry.n = true;
-        if (ov.fgColor) entry.t = ov.fgColor;
-        if (ov.glow) entry.note = 'glow';
-        if (ov.imageData) entry.note = (entry.note ? entry.note + ', ' : '') + 'custom image';
-      }
-      kleRow.push(entry);
-      cur = start + (keyDef.w || 1);
+      const effectiveFs = getEffectiveFontSize(id, 29);
+      const kw = keyDef.w || 1;
+      const gap = start - curX;
+
+      // Map font size 12-48 -> KLE scale 1-9
+      const kleFs = Math.min(9, Math.max(1, Math.round(1 + (effectiveFs - 12) * 8 / 36)));
+
+      const nextProps = {
+        c: bgColor,
+        t: fgColor,
+        f: kleFs,
+      };
+      if (gap > 0) nextProps.x = gap;
+      if (kw !== 1) nextProps.w = kw;
+      // n: true only for actual homing keys F and J
+      const isHome = effectiveLabel === 'F' || effectiveLabel === 'J';
+      if (isHome) nextProps.n = true;
+
+      emitProps(nextProps);
+      kleRow.push(effectiveLabel ?? '');
+      curX = start + kw;
     });
+
+    // Reset per-row tracking
+    currentProps = {};
     kleData.push(kleRow);
   });
 
   return JSON.stringify(kleData, null, 2);
+}
+
+export function validateKLE(json) {
+  try {
+    const data = JSON.parse(json);
+    if (!Array.isArray(data) || data.length < 2) return false;
+    const rows = data.slice(1);
+    let totalStrings = 0;
+    let lastWasObj = false;
+    for (const row of rows) {
+      if (!Array.isArray(row)) return false;
+      lastWasObj = false;
+      for (const el of row) {
+        if (typeof el === 'object' && el !== null) {
+          lastWasObj = true;
+        } else if (typeof el === 'string') {
+          totalStrings++;
+          lastWasObj = false;
+        } else {
+          return false;
+        }
+      }
+      if (lastWasObj) return false;
+    }
+    const L = LAYOUTS[state.layout];
+    const expectedKeys = L.rows().reduce((sum, r) => sum + r.length, 0);
+    return totalStrings === expectedKeys;
+  } catch {
+    return false;
+  }
 }
 
 export function downloadKLE() {

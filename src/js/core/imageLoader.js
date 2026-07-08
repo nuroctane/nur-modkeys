@@ -1,3 +1,12 @@
+const MAX_IMAGE_SIZE = 25 * 1024 * 1024;
+const ALLOWED_TYPES = ['image/png', 'image/jpeg'];
+
+export function validateImageFile(file) {
+  if (!ALLOWED_TYPES.includes(file.type)) return 'Only PNG and JPG files are accepted.';
+  if (file.size > MAX_IMAGE_SIZE) return 'File size must be under 25 MB.';
+  return null;
+}
+
 export function loadImage(file) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();

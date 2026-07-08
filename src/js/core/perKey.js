@@ -31,6 +31,11 @@ export function getEffectiveText(id, defaultLabel) {
   return (o && o.customText !== undefined) ? o.customText : defaultLabel;
 }
 
+export function hasCustomText(id) {
+  const o = store()[id];
+  return !!(o && o.customText !== undefined);
+}
+
 export function getEffectiveFg(id, defaultFg) {
   const o = store()[id];
   if (o && o.glow) return null;

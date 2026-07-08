@@ -21,12 +21,14 @@ export function generateSpec() {
       bgColor: ov.bgColor || undefined,
       glow: ov.glow || undefined,
       hasImage: !!ov.imageData,
+      imageData: ov.imageData || undefined,
       imageBehindText: ov.imageBehindText || undefined,
       fontSize: ov.fontSize || undefined,
     });
   });
 
   const spec = {
+    formatVersion: 2,
     name: `MODKEYS ${L.pct} — ${cwName}`,
     generated: new Date().toISOString(),
     configurator: 'MODKEYS by nur',

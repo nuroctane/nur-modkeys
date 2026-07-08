@@ -3,11 +3,12 @@ import { CASES, PLATES, SWITCHES, MATERIALS, PROFILES, GAP, LIGHT_COLORS } from 
 import { COLORWAYS, PANEL_SWATCHES } from '../data/colorways.js';
 import { state } from './state.js';
 
-const stage = document.getElementById('stage');
-const canvas = document.getElementById('gl');
+const getStage = () => document.getElementById('stage');
+const getCanvas = () => document.getElementById('gl');
+
 
 const renderer = new THREE.WebGLRenderer({
-  canvas,
+  canvas: getCanvas(),
   antialias: true,
   alpha: true,
   preserveDrawingBuffer: true,
@@ -261,8 +262,10 @@ export const caseGroup = new THREE.Group();
 export const capsGroup = new THREE.Group();
 export const switchGroup = new THREE.Group();
 export const knobGroup = new THREE.Group();
+export const cableGroup = new THREE.Group();
+export const wristGroup = new THREE.Group();
 export const keyGlowGroup = new THREE.Group();
-root.add(caseGroup, capsGroup, switchGroup, knobGroup, keyGlowGroup);
+root.add(caseGroup, capsGroup, switchGroup, knobGroup, cableGroup, wristGroup, keyGlowGroup);
 
 export const keyGlowGeo = new THREE.PlaneGeometry(1, 1);
 export const CAP_Y = 1.1;

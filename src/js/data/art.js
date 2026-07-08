@@ -141,6 +141,64 @@ function drawHeart(g, W, H, color) {
   g.restore();
 }
 
+function drawDiamond(g, W, H, color) {
+  const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.38;
+  g.save();
+  g.fillStyle = color;
+  g.beginPath();
+  g.moveTo(cx, cy - R);
+  g.lineTo(cx + R, cy);
+  g.lineTo(cx, cy + R);
+  g.lineTo(cx - R, cy);
+  g.closePath();
+  g.fill();
+  g.restore();
+}
+
+function drawWave(g, W, H, color) {
+  const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.3;
+  g.save();
+  g.strokeStyle = color;
+  g.lineWidth = R * 0.18;
+  g.lineCap = "round";
+  g.beginPath();
+  g.moveTo(cx - R * 1.1, cy);
+  for (let t = -1.1; t <= 1.1; t += 0.05) {
+    g.lineTo(cx + t * R, cy + Math.sin(t * Math.PI * 2) * R * 0.5);
+  }
+  g.stroke();
+  g.restore();
+}
+
+function drawHexagon(g, W, H, color) {
+  const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.38;
+  g.save();
+  g.fillStyle = color;
+  g.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+    const x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R;
+    i ? g.lineTo(x, y) : g.moveTo(x, y);
+  }
+  g.closePath();
+  g.fill();
+  g.restore();
+}
+
+function drawCrescent(g, W, H, color) {
+  const cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.35;
+  g.save();
+  g.fillStyle = color;
+  g.beginPath();
+  g.arc(cx, cy, R, 0, Math.PI * 2);
+  g.fill();
+  g.globalCompositeOperation = "destination-out";
+  g.beginPath();
+  g.arc(cx + R * 0.35, cy - R * 0.1, R * 0.75, 0, Math.PI * 2);
+  g.fill();
+  g.restore();
+}
+
 export const MARKS = {
   claude: drawClaudeMark,
   gemini: drawGeminiMark,
@@ -148,6 +206,10 @@ export const MARKS = {
   blossom: drawSakura,
   sparkles: drawStar,
   heart: drawHeart,
+  diamond: drawDiamond,
+  wave: drawWave,
+  hexagon: drawHexagon,
+  crescent: drawCrescent,
 };
 
 export const EMOJI = {
@@ -155,6 +217,10 @@ export const EMOJI = {
   blossom: "1f338",
   sparkles: "2728",
   heart: "1f49c",
+  diamond: "1f4a0",
+  wave: "1f30a",
+  hexagon: "2b23",
+  crescent: "1f319",
 };
 
 export const emojiUrl = (cp) => "https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/72x72/" + cp + ".png";
@@ -163,5 +229,17 @@ export const BRAND_MARKS = {
   claude: { Esc: "claude" },
   gemini: { Esc: "gemini" },
   sakura: { Esc: "cat", Enter: "blossom", Fn: "sparkles", Win: "heart" },
+  cream: { Esc: "heart" },
+  olive: { Esc: "diamond" },
+  ocean: { Esc: "wave" },
+  ewhite: { Esc: "diamond" },
+  noir: { Esc: "crescent" },
+  embers: { Esc: "wave", Enter: "sparkles" },
+  matcha: { Esc: "hexagon" },
+  carbon: { Esc: "hexagon" },
+  vapor: { Esc: "wave" },
+  dracula: { Esc: "crescent", Win: "sparkles" },
+  blush: { Esc: "heart", Enter: "sparkles" },
+  honey: { Esc: "hexagon" },
 };
 

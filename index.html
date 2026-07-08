@@ -2,33 +2,29 @@
 <html lang="en" data-theme="light">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>MODKEYS — Keyboard Configurator</title>
+    <link rel="icon" type="image/png" href="/assets/nodes/modkeys-logo.png" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" />
     <link rel="stylesheet" href="/src/css/variables.css" />
     <link rel="stylesheet" href="/src/css/layout.css" />
     <link rel="stylesheet" href="/src/css/components.css" />
+    <link rel="stylesheet" href="/src/css/mobile.css" />
   </head>
   <body>
     <div id="loader">
       <div class="lg">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-          <rect x="2.5" y="2.5" width="19" height="19" rx="5" />
-          <rect x="7" y="11" width="6" height="6" rx="1.5" fill="currentColor" stroke="none" />
-        </svg>
+        <img src="/assets/nodes/modkeys-logo.png" alt="" style="height:26px;width:auto" draggable="false" />
         <b>MODKEYS</b>
       </div>
       <div class="bar"><i></i></div>
     </div>
 
-    <div class="app">
+    <div class="app" id="dShell">
       <aside class="side">
         <div class="logo">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-            <rect x="2.5" y="2.5" width="19" height="19" rx="5" />
-            <rect x="7" y="11" width="6" height="6" rx="1.5" fill="currentColor" stroke="none" />
-          </svg>
+          <img src="/assets/nodes/modkeys-logo.png" alt="" style="height:24px;width:auto" draggable="false" />
           <b>MODKEYS</b>
         </div>
         <div class="sideLabel">CONFIGURE</div>
@@ -108,6 +104,12 @@
                 <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke-linejoin="round" />
               </svg>Copy KLE
             </button>
+            <button class="saveRow" id="exportPDF" style="margin-top:2px">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke-linejoin="round" />
+                <path d="M14 2v6h6M12 18V8m0 0l-4 4m4-4l4 4" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>PDF
+            </button>
           </div>
         </div>
       </aside>
@@ -180,6 +182,7 @@
             </div>
           </div>
 
+          <!-- NOTE: markup duplicated in artifacts/digital-sea/src/pages/ModkeysPage.tsx; change both -->
           <div class="featured">
             <div class="fhead">
               <h3>FEATURED BUILDS</h3>
@@ -198,6 +201,116 @@
         </div>
       </div>
     </div>
+
+    <!-- Mobile shell. Same element IDs as #dShell; shell.js selectShell()
+         swaps exactly one of the two into the live DOM BEFORE app.js loads
+         (its import graph captures #gl/#stage at module scope).
+         NOTE: markup duplicated in ModkeysPage.tsx (MSHELL_HTML); change both. -->
+    <template id="mShellTpl">
+<div class="mShell">
+      <header class="mHead">
+        <div class="mBrand">
+          <img src="/assets/nodes/modkeys-logo.png" onerror="this.onerror=null;this.src='./assets/modkeys-logo.png'" alt="" draggable="false" />
+          <b>MODKEYS</b>
+        </div>
+        <nav class="tnav" id="tnav">
+          <button data-nav="builder" class="on">Builder</button>
+          <button data-nav="gallery" aria-label="Gallery"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg></button>
+        </nav>
+        <button class="iconBtn" id="themeBtn" title="Toggle theme">
+          <svg id="sunIc" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" stroke-linecap="round" />
+          </svg>
+          <svg id="moonIc" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="display:none">
+            <path d="M20.5 14.5A8.5 8.5 0 119.5 3.5a7 7 0 1011 11z" stroke-linejoin="round" />
+          </svg>
+        </button>
+      </header>
+      <div class="mStageWrap">
+        <div class="stage" id="stage">
+          <canvas id="gl"></canvas>
+          <div class="pills" id="pills">
+            <div id="pillInd"></div>
+            <button data-view="3d" class="on" title="3D" aria-label="3D">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M12 2 21 7v10l-9 5-9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg>
+            </button>
+            <button data-view="explode" title="Explode" aria-label="Explode">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><rect x="4" y="4" width="10" height="10" rx="1.5"/><rect x="10" y="10" width="10" height="10" rx="1.5"/></svg>
+            </button>
+            <button data-view="top" title="Top" aria-label="Top">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M12 8.5V14M9.5 11.5 12 14l2.5-2.5"/></svg>
+            </button>
+            <button data-view="side" title="Side" aria-label="Side">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><rect x="7" y="5" width="10" height="14" rx="2"/><path d="M10 12h5M12.5 9.5 15 12l-2.5 2.5"/></svg>
+            </button>
+            <button data-view="front" title="Front" aria-label="Front">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M12 15.5V10M9.5 12.5 12 10l2.5 2.5"/></svg>
+            </button>
+          </div>
+          <div class="toolbar mTools">
+            <button id="toolHand" title="Pan" data-tool="pan">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <path d="M12 2.5l2 3h-4l2-3zM5.5 8l2.5-1.5V11l-2.5-3zM18.5 8L16 6.5V11l2.5-3zM12 12l1.5 4H15v5H9v-5h1.5L12 12z" />
+              </svg>
+            </button>
+            <button id="toolReset" title="Reset view">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <path d="M21 12a9 9 0 11-3-6.7" stroke-linecap="round" />
+                <path d="M21 3v5h-5" stroke-linejoin="round" />
+              </svg>
+            </button>
+            <span class="toolSep"></span>
+            <button id="toolUndo" title="Undo">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <path d="M3 10l5-5v3h7a6 6 0 010 12H8v-2" stroke-linejoin="round" />
+              </svg>
+            </button>
+            <button id="toolRedo" title="Redo">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <path d="M21 10l-5-5v3H9a6 6 0 000 12h7v-2" stroke-linejoin="round" />
+              </svg>
+            </button>
+            <span class="toolSep"></span>
+            <button id="toolShare" title="Copy share link">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+                <path d="M8.6 13.5l6.8 3.7M15.4 6.8l-6.8 3.7" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <nav class="snav mTabs" id="snav">
+        <button data-sec="layout">Layout<span class="meta" id="layoutVal">75%</span></button>
+        <button data-sec="keycaps">Keycaps<span class="dot" id="dotKeycaps"></span></button>
+        <button data-sec="switches">Switches<span class="dot" id="dotSwitches"></span></button>
+        <button data-sec="case">Case<span class="dot" id="dotCase"></span></button>
+        <button data-sec="plate">Plate<span class="dot" id="dotPlate"></span></button>
+        <button data-sec="lighting">Lighting<span class="dot" id="dotLight"></span></button>
+        <button data-sec="extras">Extras</button>
+      </nav>
+      <section class="mPanel">
+        <div class="rpHead"><h2 id="panelTitle">KEYCAPS</h2></div>
+        <div class="rpBody" id="panelBody"></div>
+      </section>
+      <div class="mBar">
+        <button class="mBarBtn" id="saveBuild">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M17.5 21l-5.5-4-5.5 4V5a2 2 0 012-2h7a2 2 0 012 2z" stroke-linejoin="round" />
+          </svg>Save Build
+        </button>
+        <button class="mBarBtn" id="mExportToggle">Export &#9662;</button>
+      </div>
+      <div class="mExportMenu" id="mExportMenu">
+        <button id="exportKLE">KLE Layout</button>
+        <button id="exportSVG">SVG Template</button>
+        <button id="exportSpec">Spec Sheet</button>
+        <button id="copyKLE">Copy KLE</button>
+        <button id="exportPDF">PDF</button>
+      </div>
+    </div>
+    </template>
 
     <div class="toast" id="toast"></div>
 
@@ -220,6 +333,11 @@
       </div>
     </div>
 
-    <script type="module" src="/src/js/app.js"></script>
+    <script type="module">
+      import { selectShell } from '/src/js/shell.js';
+      selectShell();
+      const { mountModkeys } = await import('/src/js/app.js');
+      mountModkeys();
+    </script>
   </body>
 </html>

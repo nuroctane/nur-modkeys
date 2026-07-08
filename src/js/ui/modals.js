@@ -1,11 +1,11 @@
 import { state } from '../core/state.js';
-import { setState } from '../core/update.js';
+import { setState, effectiveColorway } from '../core/update.js';
 import { LAYOUTS } from '../data/layouts.js';
 import { COLORWAYS } from '../data/colorways.js';
 import { CASES, FINISHES, PLATES, SWITCHES, MATERIALS, EXTRAS, PROFILES, LIGHT_COLORS } from '../data/components.js';
 import { PRESETS } from '../data/presets.js';
 import { toast } from './toast.js';
-import { playSwitch } from './sound.js';
+import { playKeyClick } from './sound.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -19,6 +19,8 @@ export function openModal(title, html) {
   $('modalBody').innerHTML = html;
   $('modal').classList.add('open');
 }
+
+const cwName = (snap) => snap.customColors ? 'Custom' : (COLORWAYS[snap.colorway]?.name ?? 'Custom');
 
 function syncNav(id) {
   document.querySelectorAll('#tnav button').forEach((b) => b.classList.toggle('on', b.dataset.nav === id));
@@ -49,25 +51,64 @@ export function openLibrary() {
   );
 }
 
+function thumbnailOrGradient(src, snap) {
+  if (src) return `<img src="${src}" alt="">`;
+  const cwGuess = snap?.customColors?.a?.bg && snap?.customColors?.m?.bg
+    ? [snap.customColors.a.bg, snap.customColors.m.bg]
+    : (COLORWAYS[snap?.colorway] ? [COLORWAYS[snap.colorway].a.bg, COLORWAYS[snap.colorway].m.bg] : ['#333', '#555']);
+  return `<div class="img" style="background:linear-gradient(135deg,${cwGuess[0]} 50%,${cwGuess[1]} 50%)"></div>`;
+}
+
 export function openGallery() {
   syncNav('gallery');
-  const { savedBuilds } = window.__MODKEYS__ || { savedBuilds: [] };
-  const { thumbs } = window.__MODKEYS__ || { thumbs: {} };
+  const { savedBuilds, thumbs } = window.__MODKEYS__ || { savedBuilds: [], thumbs: {} };
   let html = '<div class="secTitle">FEATURED</div><div class="galGrid">' +
     PRESETS.map((p) =>
-      `<button class="galCard" data-gal="${p.id}"><img src="${thumbs[p.id] || ''}" alt="">
-        <div class="cap"><div class="nm">${p.name}</div><div class="tg">${COLORWAYS[p.s.colorway].name}</div></div></button>`,
+      `<button class="galCard" data-gal="${p.id}">${thumbnailOrGradient(thumbs[p.id], p.s)}
+        <div class="cap"><div class="nm">${p.name}</div><div class="tg">${cwName(p.s)}</div></div></button>`,
     ).join('') + '</div>';
+  html += '<div class="secTitle">COMMUNITY</div><div class="galGrid" id="communityGrid">' +
+    '<div class="hint" style="grid-column:1/-1">Loading community builds...</div></div>';
   if (savedBuilds.length) {
     html += '<div class="secTitle">YOUR BUILDS</div><div class="galGrid">' +
       savedBuilds.map((b, i) =>
-        `<button class="galCard" data-saved="${i}"><img src="${b.img}" alt="">
-          <div class="cap"><div class="nm">${b.name}</div><div class="tg">${COLORWAYS[b.snap.colorway].name}</div></div></button>`,
+        `<button class="galCard" data-saved="${i}">${thumbnailOrGradient(b.img, b.snap)}
+          <div class="cap"><div class="nm">${b.name}</div><div class="tg">${cwName(b.snap)}</div></div></button>`,
       ).join('') + '</div>';
   } else {
     html += '<div class="secTitle">YOUR BUILDS</div><div class="hint" style="margin-bottom:16px">No saved builds yet. Use <strong>Save Build</strong> in the sidebar to save your first one.</div>';
   }
   openModal('Gallery', html);
+
+  /* lazy-load community section */
+  const lg = window.__MODKEYS__?.loadGallery;
+  if (lg) {
+    lg().then((community) => {
+      if (!$('modal').classList.contains('open')) return;
+      const grid = document.getElementById('communityGrid');
+      if (!grid) return;
+      if (community === null) {
+        grid.innerHTML = '<div class="hint" style="grid-column:1/-1">Community gallery offline. <button class="linkish" id="galleryRetry">Retry</button></div>';
+        const rb = document.getElementById('galleryRetry');
+        if (rb) rb.addEventListener('click', () => { openGallery(); });
+        return;
+      }
+      if (community.length === 0) {
+        grid.innerHTML = '<div class="hint" style="grid-column:1/-1">No community builds yet. Be the first — hit <strong>Save Build</strong>.</div>';
+        return;
+      }
+      const { thumbs } = window.__MODKEYS__ || { thumbs: {} };
+      grid.innerHTML = community.map((t) =>
+        `<button class="galCard" data-community="${t.id}">${thumbnailOrGradient(thumbs[t.id], t.snap)}<div class="cap"><div class="nm">${t.name}</div><div class="tg">${t.layout || ''}</div></div></button>`,
+      ).join('');
+    }).catch(() => {
+      const grid = document.getElementById('communityGrid');
+      if (!grid) return;
+      grid.innerHTML = '<div class="hint" style="grid-column:1/-1">Community gallery offline. <button class="linkish" id="galleryRetry">Retry</button></div>';
+      const rb = document.getElementById('galleryRetry');
+      if (rb) rb.addEventListener('click', () => { openGallery(); });
+    });
+  }
 }
 
 export function openSwitchesModal() {
@@ -113,6 +154,19 @@ $('modalBody').addEventListener('click', (ev) => {
     toast(p.name + ' loaded');
     return;
   }
+  const community = ev.target.closest('[data-community]');
+  if (community) {
+    const { galleryCache } = window.__MODKEYS__ || { galleryCache: [] };
+    const t = galleryCache.find((e) => e.id === community.dataset.community);
+    if (t && t.snap) {
+      const s = t.snap;
+      if (s.layout && s.layout !== state.layout) setState({ layout: s.layout });
+      setState(Object.assign({}, s, { selectedPreset: null }));
+      closeModal();
+      toast(t.name + ' loaded');
+    }
+    return;
+  }
   const sv = ev.target.closest('[data-saved]');
   if (sv) {
     const { savedBuilds } = window.__MODKEYS__ || { savedBuilds: [] };
@@ -126,7 +180,7 @@ $('modalBody').addEventListener('click', (ev) => {
   const swm = ev.target.closest('[data-swm]');
   if (swm) {
     setState({ sw: swm.dataset.swm, selectedPreset: null });
-    playSwitch(SWITCHES[swm.dataset.swm].sound);
+    playKeyClick(SWITCHES[swm.dataset.swm].sound, state.material);
     openSwitchesModal();
     return;
   }

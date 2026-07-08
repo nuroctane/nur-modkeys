@@ -3,8 +3,9 @@ import { LAYOUTS } from '../data/layouts.js';
 import { COLORWAYS } from '../data/colorways.js';
 import { PROFILES, SWITCHES, GAP } from '../data/components.js';
 import { state } from './state.js';
+import { effectiveColorway } from './update.js';
 import {
-  renderer, scene, camera, root, caseGroup, capsGroup, switchGroup, knobGroup, keyGlowGroup,
+  renderer, scene, camera, root, caseGroup, capsGroup, switchGroup, knobGroup, cableGroup, wristGroup, keyGlowGroup,
   capMats, matCase, matPlate, matSwBody, matStem, matKnob,
   skirtMat, keyGlowMat, keyGlowGeo, createLegendGlowMat,
   CAP_Y, setPlateMesh, setBoardDims, sRGB, uni,
@@ -14,7 +15,7 @@ import { BRAND_MARKS, MARKS, EMOJI, emojiUrl } from '../data/art.js';
 import {
   getEffectiveText, getEffectiveFg, getEffectiveMark,
   getEffectiveImage, getEffectiveFontSize, hasGlow, hasImageBehindText,
-  getOverride, keyId as perKeyId, getAllEntries,
+  getOverride, keyId as perKeyId, getAllEntries, hasCustomText,
 } from './perKey.js';
 import { composeLegend, renderText } from './imageLoader.js';
 
@@ -112,7 +113,7 @@ function legendTex(label, wU, fg, mark, opts) {
   const useLabel = (opts.customText !== undefined) ? opts.customText : label;
   const useFg = (opts.customFg !== undefined) ? opts.customFg : fg;
   const useText = useLabel || '';
-  const cacheKey = (useLabel || '') + '|' + wU + '|' + (useFg || 'nofg') + (mark ? '|' + mark : '') + (opts.imageData ? '|img' : '') + (opts.glow ? '|glow' : '');
+  const cacheKey = (useLabel || '') + '|' + wU + '|' + (useFg || 'nofg') + (mark ? '|' + mark : '') + (opts.imageData ? '|img' : '') + (opts.glow ? '|glow' : '') + (opts.imageBehindText ? '|ibt' : '') + '|fs' + (opts.fontSize || '29');
   if (!opts.glow && legendCache.has(cacheKey)) return legendCache.get(cacheKey);
   const W = Math.max(128, Math.round(128 * wU)) * S, H = 128 * S;
   const c = document.createElement('canvas');
@@ -185,6 +186,8 @@ function disposeGroup(gr) {
 export function buildCase() {
   disposeGroup(caseGroup);
   disposeGroup(knobGroup);
+  disposeGroup(cableGroup);
+  disposeGroup(wristGroup);
   const L = LAYOUTS[state.layout];
   boardW = L.total + 1.0;
   boardD = 6.0;
@@ -242,6 +245,33 @@ export function buildCase() {
     knobGroup.traverse((n) => (n.userData.isKnob = true));
   }
   knobGroup.visible = !!L.knob && state.extras.knob;
+  {
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 0.04, -boardD / 2 - 0.3),
+      new THREE.Vector3(0, 0.1, -boardD / 2 - 0.7),
+      new THREE.Vector3(0, 0.35, -boardD / 2 - 1.3),
+    ]);
+    const tube = new THREE.Mesh(
+      new THREE.TubeGeometry(curve, 14, 0.05, 8, false),
+      new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6, metalness: 0.15 }),
+    );
+    tube.castShadow = true;
+    cableGroup.add(tube);
+  }
+  cableGroup.visible = state.extras.cable;
+  {
+    const w = boardW * 0.72;
+    const shape = new THREE.Shape();
+    const r = 0.15, hw = w / 2, hd = 0.4;
+    shape.moveTo(-hw + r, -hd).lineTo(hw - r, -hd).quadraticCurveTo(hw, -hd, hw, -hd + r).lineTo(hw, hd - r).quadraticCurveTo(hw, hd, hw - r, hd).lineTo(-hw + r, hd).quadraticCurveTo(-hw, hd, -hw, hd - r).lineTo(-hw, -hd + r).quadraticCurveTo(-hw, -hd, -hw + r, -hd);
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.35, bevelEnabled: true, bevelSize: 0.04, bevelThickness: 0.04, bevelSegments: 4 });
+    const wrist = new THREE.Mesh(geo, matCase);
+    wrist.position.set(0, 0, boardD / 2 + 0.5);
+    wrist.rotation.x = -Math.PI / 2;
+    wrist.castShadow = wrist.receiveShadow = true;
+    wristGroup.add(wrist);
+  }
+  wristGroup.visible = state.extras.wrist;
   aoPlane.scale.set(boardW * 1.3, boardD * 1.7, 1);
   glowPlane.scale.set(boardW * 1.9, boardD * 2.9, 1);
 }
@@ -259,20 +289,27 @@ function makeSwitch(x, z) {
 }
 
 function buildOneKey(keyDef, ri, ci, cx, cz, prof, cw, addToGroups) {
-  const mesh = new THREE.Mesh(capGeo(keyDef.w, state.profile), capMats[keyDef.r]);
+  const id = perKeyId(ri, ci);
+  const customBg = (getOverride(id) && getOverride(id).bgColor) || null;
+  const mat = customBg ? capMats[keyDef.r].clone() : capMats[keyDef.r];
+  if (customBg) {
+    mat.color.copy(sRGB(customBg));
+    mat.needsUpdate = true;
+  }
+  const mesh = new THREE.Mesh(capGeo(keyDef.w, state.profile), mat);
+  if (customBg) mesh.userData.ownMat = true;
   mesh.userData.gk = keyDef.w + '|' + state.profile;
   mesh.castShadow = mesh.receiveShadow = true;
   mesh.position.set(cx, CAP_Y, cz);
   mesh.rotation.x = prof.tilt[ri];
-  const id = perKeyId(ri, ci);
   const effectiveLabel = getEffectiveText(id, keyDef.l);
   const effectiveFg = getEffectiveFg(id, cw[keyDef.r].fg);
   const effectiveMark = getEffectiveMark(id, markFor(keyDef.l));
+  const userMark = hasCustomText(id) ? null : effectiveMark;
   const effectiveImage = getEffectiveImage(id);
   const effectiveFs = getEffectiveFontSize(id, 29);
   const glow = hasGlow(id);
   const imgBehind = hasImageBehindText(id);
-  const customBg = (getOverride(id) && getOverride(id).bgColor) || null;
 
   mesh.userData = Object.assign(mesh.userData, {
     isCap: true, baseY: CAP_Y, row: ri, col: ci,
@@ -293,7 +330,7 @@ function buildOneKey(keyDef, ri, ci, cx, cz, prof, cw, addToGroups) {
     const leg = new THREE.Mesh(
       new THREE.PlaneGeometry(topW, topD),
       new THREE.MeshBasicMaterial({
-        map: legendTex(keyDef.l, keyDef.w, cw[keyDef.r].fg, effectiveMark, texOpts),
+        map: legendTex(keyDef.l, keyDef.w, cw[keyDef.r].fg, userMark, texOpts),
         transparent: true,
         depthWrite: false,
       }),
@@ -307,7 +344,7 @@ function buildOneKey(keyDef, ri, ci, cx, cz, prof, cw, addToGroups) {
 
     if (glow) {
       const glowMat = createLegendGlowMat();
-      const maskTex = legendTex(keyDef.l, keyDef.w, '#ffffff', effectiveMark, texOpts);
+      const maskTex = legendTex(keyDef.l, keyDef.w, '#ffffff', userMark, texOpts);
       glowMat.uniforms.uMask.value = maskTex;
       const glowLeg = new THREE.Mesh(new THREE.PlaneGeometry(topW, topD), glowMat);
       glowLeg.rotation.x = -Math.PI / 2;
@@ -338,7 +375,7 @@ export function buildKeys() {
   disposeGroup(keyGlowGroup);
   const L = LAYOUTS[state.layout], rows = L.rows(), center = L.total / 2;
   const prof = PROFILES[state.profile];
-  const cw = COLORWAYS[state.colorway];
+  const cw = effectiveColorway();
   rows.forEach((row, ri) => {
     let cur = 0;
     row.forEach((keyDef, ci) => {
@@ -353,7 +390,7 @@ export function buildKeys() {
 export function rebuildKey(ri, ci) {
   const L = LAYOUTS[state.layout], rows = L.rows(), center = L.total / 2;
   const prof = PROFILES[state.profile];
-  const cw = COLORWAYS[state.colorway];
+  const cw = effectiveColorway();
   if (ri >= rows.length) return;
   const row = rows[ri];
   if (ci >= row.length) return;
@@ -371,6 +408,7 @@ export function rebuildKey(ri, ci) {
   for (let i = capsGroup.children.length - 1; i >= 0; i--) {
     const c = capsGroup.children[i];
     if (c.userData.perKeyId === id) {
+      if (c.userData.ownMat) c.traverse((n) => n.material?.dispose?.());
       capsGroup.remove(c);
       c.traverse((n) => {
         if (n.geometry && n.userData.gk !== keyDef.w + '|' + state.profile) n.geometry.dispose();
@@ -399,19 +437,25 @@ export function rebuildKey(ri, ci) {
   keyGlowGroup.add(glow);
 }
 
+export function getKeyLabel(id) {
+  const c = capsGroup.children.find(k => k.userData.perKeyId === id);
+  return c ? c.userData.label : '';
+}
+
 export function rebuildBoard() {
   buildCase();
   buildKeys();
 }
 
 export function refreshLegends() {
-  const cw = COLORWAYS[state.colorway];
+  const cw = effectiveColorway();
   capsGroup.children.forEach((c) => {
     if (!c.userData.legend) return;
     const id = c.userData.perKeyId;
     const effectiveLabel = getEffectiveText(id, c.userData.label);
     const effectiveFg = getEffectiveFg(id, cw[c.userData.role].fg);
     const effectiveMark = getEffectiveMark(id, markFor(c.userData.label));
+    const userMark = hasCustomText(id) ? null : effectiveMark;
     const effectiveImage = getEffectiveImage(id);
     const effectiveFs = getEffectiveFontSize(id, 29);
     const glow = hasGlow(id);
@@ -425,14 +469,14 @@ export function refreshLegends() {
       fontSize: effectiveFs,
     };
     c.userData.legend.material.map = legendTex(
-      c.userData.label, c.userData.w, cw[c.userData.role].fg, effectiveMark, texOpts,
+      c.userData.label, c.userData.w, cw[c.userData.role].fg, userMark, texOpts,
     );
     c.userData.legend.material.needsUpdate = true;
     if (glow && !c.userData.glowLegend) {
       const topW = (c.userData.w - GAP) * PROFILES[state.profile].taper * 0.92;
       const topD = (1 - GAP) * PROFILES[state.profile].taper * 0.82;
       const glowMat = createLegendGlowMat();
-      const maskTex = legendTex(c.userData.label, c.userData.w, '#ffffff', effectiveMark, texOpts);
+      const maskTex = legendTex(c.userData.label, c.userData.w, '#ffffff', userMark, texOpts);
       glowMat.uniforms.uMask.value = maskTex;
       const glowLeg = new THREE.Mesh(new THREE.PlaneGeometry(topW, topD), glowMat);
       glowLeg.rotation.x = -Math.PI / 2;
@@ -445,7 +489,7 @@ export function refreshLegends() {
       c.userData.glowLegend = null;
     } else if (glow && c.userData.glowLegend) {
       c.userData.glowLegend.material.uniforms.uMask.value = legendTex(
-        c.userData.label, c.userData.w, '#ffffff', effectiveMark, texOpts,
+        c.userData.label, c.userData.w, '#ffffff', userMark, texOpts,
       );
     }
   });

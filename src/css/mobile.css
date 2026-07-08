@@ -1,0 +1,254 @@
+/*__MODKEYS_MOBILE_CSS_v072__*/
+/* ============================================================
+   MOBILE SHELL (v0.70)
+   Everything in this file is scoped to .mShell (in-shell layout)
+   or html.mk-mobile (shared overlays: key editor, modal, toast).
+   Desktop CSS never applies to the mobile shell and vice versa;
+   mountModkeys() puts exactly one shell in the DOM.
+   Portrait-first; landscape handled at the bottom of this file.
+   ============================================================ */
+
+.mShellHost { display: contents; }
+
+.mShell {
+  display: grid;
+  grid-template-rows: auto auto auto 1fr;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+  overflow: hidden;
+  padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)); /* mBar clearance */
+}
+
+/* ---- header ---- */
+.mShell .mHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.mShell .mBrand { display: flex; align-items: center; gap: 8px; font-weight: 800; letter-spacing: 0.06em; }
+.mShell .mBrand img { height: 22px; width: auto; }
+.mShell .mHead .tnav { display: flex; gap: 4px; margin-left: auto; }
+.mShell .mHead .tnav button {
+  height: 34px; padding: 0 12px; border-radius: 9px;
+  font-size: 12.5px; font-weight: 700; color: var(--ink2);
+  touch-action: manipulation;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.mShell .mHead .tnav button.on { background: var(--card); color: var(--ink); }
+.mShell .mHead .iconBtn { width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 10px; }
+
+/* ---- stage ---- */
+.mShell .mStageWrap { position: relative; }
+.mShell .stage {
+  position: relative;
+  height: 42vh;
+  height: 42dvh;
+  min-height: 240px;
+  touch-action: none; /* canvas orbit/pinch owns all touch gestures */
+  background: var(--stageBg, var(--bg));
+  border-bottom: 1px solid var(--line);
+}
+.mShell #gl { width: 100%; height: 100%; display: block; }
+/* View pills: a single full-width horizontal bar pinned to the BOTTOM of the
+   stage. The previous top-left flex-wrap pushed "3D"/"Explode" onto a second
+   row that overlapped the scene and fell outside #pillInd's tracking, so they
+   read as missing. One non-wrapping scrollable row shows all five, and the
+   active state is a solid button background (no absolutely-positioned slider
+   to fall out of sync). */
+.mShell .pills {
+  position: absolute; left: 8px; right: 8px; bottom: 8px; top: auto;
+  transform: none; /* override desktop .pills translateX(-50%) that pushed row off-screen */
+  display: flex; flex-wrap: nowrap; gap: 3px; padding: 3px;
+  background: var(--panel); /* fallback */
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  border: 1px solid var(--line); border-radius: 11px;
+  max-width: none;
+  overflow-x: auto; scrollbar-width: none;
+}
+.mShell .pills::-webkit-scrollbar { display: none; }
+.mShell .pills button {
+  height: 36px; padding: 0; border-radius: 8px; flex: 1 1 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink2); touch-action: manipulation;
+}
+.mShell .pills button svg { width: 22px; height: 22px; pointer-events: none; }
+.mShell .pills button.on { color: var(--ink); background: var(--card); }
+.mShell #pillInd { display: none; } /* replaced by button.on background on mobile */
+/* Tools move to the TOP-right so they no longer share an edge with the
+   bottom pill bar. */
+.mShell .mTools {
+  position: absolute; right: 8px; top: 8px; bottom: auto;
+  display: flex; align-items: center; gap: 2px; padding: 3px;
+  background: var(--panel); /* fallback */
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  border: 1px solid var(--line); border-radius: 11px;
+}
+.mShell .mTools button {
+  width: 40px; height: 40px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink2); touch-action: manipulation;
+}
+.mShell .mTools button.on { background: var(--card); color: var(--ink); }
+.mShell .mTools .toolSep { width: 1px; height: 20px; background: var(--line); margin: 0 2px; }
+
+/* ---- section tabs: compact wrapping pills ----
+   Single non-wrapping scrollable row; the meta value + unsaved dot ride
+   inside each pill. */
+.mShell .mTabs {
+  display: flex;
+  /* flex-direction stated explicitly: the desktop sidebar's `.snav
+     { flex-direction: column }` used to leak in here (the tabs share the
+     .snav class) and stacked the pills full-width. The desktop rule is now
+     .dShell-scoped, but this line guarantees row layout regardless. */
+  flex-direction: row;
+  flex-wrap: wrap; justify-content: center; align-items: center;
+  gap: 5px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.mShell .mTabs button {
+  flex: 0 0 auto; width: auto; height: 32px; padding: 0 12px;
+  border-radius: 999px;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  font-size: 12px; font-weight: 700; color: var(--ink2);
+  background: var(--card2, transparent);
+  border: 1px solid var(--line);
+  touch-action: manipulation;
+}
+.mShell .mTabs button.on { background: var(--card); color: var(--ink); }
+.mShell .mTabs .meta { font-size: 10px; font-weight: 800; color: var(--acc, var(--ink2)); }
+.mShell .mTabs .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--acc, #6cf); opacity: 0; transition: opacity 0.2s;
+}
+.mShell .mTabs .dot.on { opacity: 1; }
+
+/* ---- panel: title inline, more room for controls ---- */
+.mShell .mPanel {
+  min-height: 0;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.mShell .mPanel .rpHead { padding: 8px 14px 2px; }
+.mShell .mPanel .rpHead h2 { font-size: 10.5px; letter-spacing: 0.14em; }
+.mShell .mPanel .rpBody {
+  flex: 1; min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: auto;
+  padding: 4px 14px 20px;
+}
+
+/* touch-sized panel controls (content markup comes from renderPanel,
+   base styles from components.css; these are size-only overrides) */
+.mShell .chip { min-height: 38px; touch-action: manipulation; }
+.mShell .sw { width: 32px; height: 32px; }
+.mShell .profBtn { min-width: 48px; min-height: 40px; }
+.mShell .libBtn, .mShell .saveRow { min-height: 44px; }
+.mShell input[type="text"], .mShell input[type="number"] { font-size: 16px; min-height: 40px; } /* iOS focus-zoom guard */
+.mShell input[type="color"] { min-width: 42px; min-height: 36px; }
+.mShell .slider { height: 28px; }
+.mShell .slider::-webkit-slider-thumb { width: 22px; height: 22px; }
+
+/* ---- bottom action bar + export sheet ---- */
+.mShell .mBar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+  display: flex; gap: 8px;
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+  background: var(--side); color: var(--sideTx);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.mShell .mBarBtn {
+  flex: 1; height: 42px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: rgba(255, 255, 255, 0.08); color: var(--sideTx);
+  font-size: 13px; font-weight: 700; touch-action: manipulation;
+}
+.mShell .mBarBtn:active { background: rgba(255, 255, 255, 0.16); }
+.mShell .mExportMenu {
+  display: none;
+  position: fixed; left: 10px; right: 10px;
+  bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  z-index: 61;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 14px; box-shadow: 0 12px 40px var(--shadowC);
+  padding: 8px;
+}
+.mShell .mExportMenu.open { display: block; }
+.mShell .mExportMenu button {
+  width: 100%; min-height: 46px; border-radius: 10px;
+  display: flex; align-items: center; padding: 0 14px;
+  font-size: 14px; font-weight: 600; color: var(--ink);
+  touch-action: manipulation;
+}
+.mShell .mExportMenu button:active { background: var(--card); }
+
+/* ---- modal scroll (MOBILE ONLY — mobile.css loads on desktop too, so
+   every overlay rule must be scoped under html.mk-mobile or .mShell) ---- */
+html.mk-mobile .modalCard {
+  display: flex;
+  flex-direction: column;
+}
+html.mk-mobile .modalCard .mBody {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---- shared overlays, mobile treatment (live outside .mShell) ---- */
+html.mk-mobile .kePop {
+  left: 0; right: 0; bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+  top: auto; width: auto; max-width: none;
+  transform: none;
+  border-radius: 16px 16px 0 0;
+  max-height: 48vh; max-height: 48dvh;
+  overflow-y: auto;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+}
+html.mk-mobile .modalBack .modalCard,
+html.mk-mobile .modalCard {
+  width: 100vw; height: 100vh; height: 100dvh;
+  max-width: none; max-height: none;
+  border-radius: 0;
+}
+html.mk-mobile .toast { top: calc(52px + env(safe-area-inset-top, 0px)); }
+
+/* ============================================================
+   LANDSCAPE (phones sideways, small tablets)
+   Stage left, tabs+panel right, bar spans the right column.
+   ============================================================ */
+@media (orientation: landscape) and (max-height: 560px) {
+  .mShell {
+    grid-template-rows: auto auto 1fr;
+    grid-template-columns: 56% 44%;
+    grid-template-areas:
+      "head head"
+      "stage tabs"
+      "stage panel";
+    padding-bottom: 0;
+  }
+  .mShell .mHead { grid-area: head; }
+  .mShell .mStageWrap { grid-area: stage; min-height: 0; }
+  .mShell .stage { height: 100%; min-height: 0; border-right: 1px solid var(--line); border-bottom: none; }
+  .mShell .mTabs { grid-area: tabs; }
+  .mShell .mPanel {
+    grid-area: panel;
+    padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+  }
+  .mShell .mBar {
+    left: 56%; /* only under the panel column */
+  }
+  .mShell .mExportMenu { left: calc(56% + 10px); }
+  html.mk-mobile .kePop { left: 56%; }
+}

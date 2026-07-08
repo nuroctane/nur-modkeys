@@ -1,16 +1,18 @@
 {
-  "name": "modkeys",
+  "name": "@workspace/modkeys",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+                    "build": "node --check src/js/app.js && node --check src/js/ui/panels.js && node --check src/js/ui/modals.js && node --check src/js/export/kle.js && node --check src/js/export/svg.js && node --check src/js/export/pdf.js && node --check src/js/export/spec.js",
     "preview": "vite preview"
   },
   "dependencies": {
-    "three": "^0.170.0",
-    "gsap": "^3.12.5"
+    "three": "^0.184.0",
+    "gsap": "^3.12.5",
+    "jspdf": "^2.5.2",
+    "svg2pdf.js": "^2.2.4"
   },
   "devDependencies": {
     "vite": "^6.3.1"

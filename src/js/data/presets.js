@@ -39,6 +39,7 @@ export const PRESETS = [
     id: "cream-dream",
     name: "Cream Dream",
     s: {
+      brand: "cream",
       colorway: "desert",
       caseColor: "ewhite",
       sw: "boba",
@@ -49,6 +50,7 @@ export const PRESETS = [
     id: "olive-green",
     name: "Olive Green",
     s: {
+      brand: "olive",
       colorway: "moss",
       caseColor: "olive",
       sw: "panda",
@@ -59,6 +61,7 @@ export const PRESETS = [
     id: "ocean-blue",
     name: "Ocean Blue",
     s: {
+      brand: "ocean",
       colorway: "deepsea",
       caseColor: "navy",
       sw: "jade",
@@ -69,10 +72,108 @@ export const PRESETS = [
     id: "e-white",
     name: "E-White",
     s: {
+      brand: "ewhite",
       colorway: "bowred",
       caseColor: "silver",
       sw: "boba",
       light: { mode: "off", color: "#ffffff", bright: 1 },
+    },
+  },
+  // NEW PRESETS
+  {
+    id: "noir",
+    name: "Noir",
+    s: {
+      brand: "noir",
+      colorway: "noir",
+      caseColor: "midnight",
+      plate: "steel",
+      sw: "silver",
+      light: { mode: "static", color: "#ffffff", bright: 0.3 },
+    },
+  },
+  {
+    id: "embers",
+    name: "Embers",
+    s: {
+      brand: "embers",
+      colorway: "embers",
+      caseColor: "burgundy",
+      plate: "copper",
+      sw: "cream",
+      light: { mode: "static", color: "#ff6b35", bright: 0.8 },
+    },
+  },
+  {
+    id: "matcha",
+    name: "Matcha",
+    s: {
+      brand: "matcha",
+      colorway: "matcha",
+      caseColor: "forest",
+      plate: "pom",
+      sw: "teal",
+      light: { mode: "static", color: "#4caf50", bright: 0.7 },
+    },
+  },
+  {
+    id: "carbon",
+    name: "Carbon",
+    s: {
+      brand: "carbon",
+      colorway: "carbon",
+      caseColor: "spacegray",
+      plate: "carbon",
+      sw: "topaz",
+      light: { mode: "static", color: "#ff6b35", bright: 0.9 },
+    },
+  },
+  {
+    id: "vapor",
+    name: "Vaporwave",
+    s: {
+      brand: "vapor",
+      colorway: "vapor",
+      caseColor: "arctic",
+      plate: "fr4",
+      sw: "emerald",
+      light: { mode: "static", color: "#ff00ff", bright: 0.6 },
+    },
+  },
+  {
+    id: "dracula",
+    name: "Dracula",
+    s: {
+      brand: "dracula",
+      colorway: "dracula",
+      caseColor: "midnight",
+      plate: "copper",
+      sw: "emerald",
+      light: { mode: "static", color: "#ff79c6", bright: 0.7 },
+    },
+  },
+  {
+    id: "blush",
+    name: "Blush",
+    s: {
+      brand: "blush",
+      colorway: "blush",
+      caseColor: "sakura",
+      plate: "brass",
+      sw: "cream",
+      light: { mode: "static", color: "#ffb6c1", bright: 0.6 },
+    },
+  },
+  {
+    id: "honey",
+    name: "Honey",
+    s: {
+      brand: "honey",
+      colorway: "honey",
+      caseColor: "sakura",
+      plate: "brass",
+      sw: "silver",
+      light: { mode: "static", color: "#ffd700", bright: 0.7 },
     },
   },
 ];

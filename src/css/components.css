@@ -871,71 +871,34 @@
 }
 
 /* ---------- responsive ---------- */
-@media (max-width: 1024px) {
-  .pills button { height: 32px; padding: 0 12px; font-size: 12px; }
-  #pillInd { height: 32px; }
-  .toolbar button { width: 44px; height: 36px; }
-  .kePop { width: 320px; }
-  .preview { height: 160px; }
+/* v3: arrows edge state + inline retry link */
+.farrows button:disabled {
+  opacity: 0.35;
+  cursor: default;
+  transform: none;
+}
+.linkish {
+  background: transparent;
+  border: none;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
 }
 
-@media (max-width: 768px) {
-  .pills { top: 10px; gap: 1px; padding: 3px; }
-  .pills button { height: 30px; padding: 0 10px; font-size: 11px; }
-  #pillInd { height: 30px; top: 3px; }
-  .toolbar { bottom: 10px; gap: 1px; padding: 3px; }
-  .toolbar button { width: 40px; height: 34px; }
-  .toolSep { margin: 3px 1px; }
-  .kePop {
-    left: 12px; right: 12px; bottom: 12px;
-    transform: none; width: auto;
-    max-height: 50vh;
-  }
-  .kePop.open { transform: none; }
-  .keBody { max-height: 30vh; overflow-y: auto; }
-  .modalCard { width: 96vw; max-height: 90vh; border-radius: 16px; }
-  .mHead { padding: 16px 18px 12px; }
-  .mBody { padding: 4px 18px 18px; }
-  .mHead h3 { font-size: 14px; }
-  .libGrid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
-  .galGrid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-  .libCard { padding: 10px; }
-  .galCard img { height: 90px; }
-  .chip { height: 34px; padding: 0 12px; font-size: 12px; border-radius: 9px; }
-  .sw { width: 30px; height: 30px; }
-  .profBtn { width: 48px; height: 38px; }
-  .preview { height: 120px; margin-bottom: 10px; }
-  .grp { margin-bottom: 14px; }
-  .glabel { font-size: 11px; margin-bottom: 6px; }
-  .hexGrid { flex-wrap: wrap; }
-  .hexCol { flex: 0 0 50%; min-width: 0; }
-  .optCard { padding: 10px 12px; }
-  .optCard .t1 { font-size: 12px; }
-  .optCard .t2 { font-size: 11px; }
-  .togRow { padding: 10px 2px; }
-  .togRow .t1 { font-size: 12px; }
-  .togRow .t2 { font-size: 11px; }
-  .libBtn { height: 40px; font-size: 12px; }
-  .saveRow { font-size: 12px; height: 40px; }
-  .toast { top: 56px; font-size: 12px; padding: 8px 16px; }
-}
+/* ============================================================
+   v0.66 mobile pass
+   ============================================================ */
 
-@media (max-width: 420px) {
-  .pills button { height: 26px; padding: 0 8px; font-size: 10px; }
-  #pillInd { height: 26px; }
-  .toolbar button { width: 36px; height: 30px; }
-  .toolbar button svg { width: 16px; height: 16px; }
-  .preview { height: 90px; }
-  .chip { height: 30px; padding: 0 8px; font-size: 11px; }
-  .sw { width: 26px; height: 26px; }
-  .profBtn { width: 40px; height: 32px; }
-  .libGrid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
-  .galGrid { grid-template-columns: 1fr 1fr; gap: 8px; }
-  .galCard img { height: 70px; }
-  .modalCard { width: 100vw; max-height: 100vh; border-radius: 0; }
-  .keRow { flex-wrap: wrap; }
-  .keRow label:first-child { width: 70px; font-size: 11px; }
-  .bcard { flex: 0 0 120px; }
-  .bcard .img { height: 68px; }
-  .bcard .nm { font-size: 11px; }
-}
+/* Touch input model: without touch-action:none the browser treats canvas
+   drags as page scroll / pinch-zoom and fires pointercancel mid-orbit.
+   UI buttons get `manipulation` to kill the 300ms double-tap-zoom delay
+   (which also broke the double-tap key editor on some browsers). */
+#gl, .stage { touch-action: none; }
+button, .chip, .sw, .profBtn, .dShell .snav button, .tnav button, .pills button,
+.toolbar button, .saveRow { touch-action: manipulation; }
+
+
+/* Landscape phones: a fixed 340px stage plus bars leaves no room for the
+   panel; give the stage proportional height and slim the chrome. */

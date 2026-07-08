@@ -39,3 +39,44 @@ export function playSwitch(type) {
     ns.start(t);
   } catch (e) {}
 }
+
+export function playKeyClick(switchType, material) {
+  playSwitch(switchType);
+  if (material === 'pbt') return;
+  try {
+    const AC2 = AC || new (window.AudioContext || window.webkitAudioContext)();
+    AC = AC2;
+    if (AC.state === 'suspended') AC.resume();
+    const t = AC.currentTime;
+    const isCeramic = material === 'ceramic';
+    const freq = isCeramic ? 680 : 320;
+    const gain = isCeramic ? 0.04 : 0.03;
+    const decay = isCeramic ? 0.1 : 0.06;
+    const gg = AC.createGain();
+    gg.connect(AC.destination);
+    gg.gain.setValueAtTime(0.0001, t);
+    gg.gain.exponentialRampToValueAtTime(gain, t + 0.003);
+    gg.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+    const osc = AC.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, t);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.3, t + decay);
+    osc.connect(gg);
+    osc.start(t);
+    osc.stop(t + decay + 0.02);
+    if (isCeramic) {
+      const g2 = AC.createGain();
+      g2.connect(AC.destination);
+      g2.gain.setValueAtTime(0.0001, t);
+      g2.gain.exponentialRampToValueAtTime(0.025, t + 0.005);
+      g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+      const o2 = AC.createOscillator();
+      o2.type = 'sine';
+      o2.frequency.setValueAtTime(1400, t);
+      o2.frequency.exponentialRampToValueAtTime(900, t + 0.15);
+      o2.connect(g2);
+      o2.start(t);
+      o2.stop(t + 0.18);
+    }
+  } catch (e) {}
+}

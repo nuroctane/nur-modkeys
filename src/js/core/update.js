@@ -5,13 +5,21 @@ import { LAYOUTS } from '../data/layouts.js';
 import { COLORWAYS } from '../data/colorways.js';
 import { CASES, FINISHES, PLATES, SWITCHES, MATERIALS, PROFILES, GAP } from '../data/components.js';
 import {
-  renderer, scene, camera, root, caseGroup, capsGroup, knobGroup,
+  renderer, scene, camera, root, caseGroup, capsGroup, knobGroup, cableGroup, wristGroup,
   matAlpha, matMod, matAccent, matCase, matPlate, matStem,
   capMats, applyPlateFinish, uni, sRGB,
 } from './scene.js';
 import { rebuildBoard, buildKeys, refreshLegends, preloadEmoji } from './keyboard.js';
 import { setView } from './controls.js';
 import { pushState, undo as undoHistory, redo as redoHistory } from './history.js';
+
+/* Panel re-render hook. panels.js statically imports this module, so a static
+   import back would be circular; app.js (which imports both) registers the
+   real renderPanel here at boot. Replaces a mixed dynamic/static import that
+   tripped a Vite chunking warning. */
+let panelRenderHook = null;
+export function onPanelRender(fn) { panelRenderHook = fn; }
+
 
 let _syncUI = null;
 const RM = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -52,12 +60,12 @@ function applyColors(cw) {
 
 function applyInstant(s) {
   if (s.brand !== undefined) state.brand = s.brand;
-  if (s.colorway) {
+  if (s.colorway && COLORWAYS[s.colorway]) {
     applyColors(COLORWAYS[s.colorway]);
     state.colorway = s.colorway;
     state.customColors = null;
     refreshLegends();
-    import('../ui/panels.js').then(m => m.renderPanel(state.section));
+    if (panelRenderHook) panelRenderHook(state.section);
   } else if (s.customColors) {
     applyColors(s.customColors);
     state.customColors = s.customColors;
@@ -103,6 +111,8 @@ function applyInstant(s) {
   if (s.extras) {
     state.extras = Object.assign({}, state.extras, s.extras);
     knobGroup.visible = LAYOUTS[state.layout].knob && state.extras.knob;
+    cableGroup.visible = state.extras.cable;
+    wristGroup.visible = state.extras.wrist;
   }
   if (s.perKeyOverrides) {
     state.perKeyOverrides = s.perKeyOverrides;
@@ -140,7 +150,7 @@ function apply3D(patch, animate) {
     if (patch.profile) { state.profile = patch.profile; buildKeys(); }
     return;
   }
-  if (patch.colorway) {
+  if (patch.colorway && COLORWAYS[patch.colorway]) {
     const cw = COLORWAYS[patch.colorway];
     tweenColor(matAlpha, cw.a.bg);
     tweenColor(matMod, cw.m.bg);
@@ -173,8 +183,11 @@ function apply3D(patch, animate) {
     });
   }
   if (patch.light) applyLight();
-  if (patch.extras !== undefined)
+  if (patch.extras !== undefined) {
     knobGroup.visible = LAYOUTS[state.layout].knob && state.extras.knob;
+    cableGroup.visible = state.extras.cable;
+    wristGroup.visible = state.extras.wrist;
+  }
   if (patch.profile) { buildKeys(); popKeys(); }
   if (patch.layout) {
     if (state.exploded) setView('3d');
