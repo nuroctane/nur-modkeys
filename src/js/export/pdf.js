@@ -21,6 +21,11 @@ export async function exportPDF() {
   const doc = new jsPDF({ unit: 'mm', format: [maxW + 20, totalH + 30] });
   await doc.svg(svgEl, { x: 10, y: 10, width: maxW, height: totalH });
   doc.setFontSize(8);
-  doc.text(`${'MODKEYS'} — ${LAYOUTS[state.layout].pct} — ${cwName} — ${new Date().toISOString().slice(0, 10)}`, 10, totalH + 22);
+  const lightBit = `${state.light.mode}/${state.light.color}`;
+  doc.text(
+    `MODKEYS — ${LAYOUTS[state.layout].pct} — ${cwName} — ${state.profile} — ${state.sw} — ${lightBit} — ${new Date().toISOString().slice(0, 10)}`,
+    10,
+    totalH + 22,
+  );
   doc.save(`modkeys-${state.layout}-${cwName}.pdf`);
 }

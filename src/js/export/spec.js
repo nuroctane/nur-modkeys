@@ -14,21 +14,27 @@ export function generateSpec() {
 
   const perKeyInfo = [];
   getAllEntries().forEach(([id, ov]) => {
-    perKeyInfo.push({
-      key: id,
-      customText: ov.customText || undefined,
-      fgColor: ov.fgColor || undefined,
-      bgColor: ov.bgColor || undefined,
-      glow: ov.glow || undefined,
-      hasImage: !!ov.imageData,
-      imageData: ov.imageData || undefined,
-      imageBehindText: ov.imageBehindText || undefined,
-      fontSize: ov.fontSize || undefined,
-    });
+    const entry = { key: id };
+    if (ov.customText !== undefined) entry.customText = ov.customText;
+    if (ov.fgColor) entry.fgColor = ov.fgColor;
+    if (ov.bgColor) entry.bgColor = ov.bgColor;
+    if (ov.glow === true) entry.glow = true;
+    if (ov.imageData) {
+      entry.hasImage = true;
+      entry.imageData = ov.imageData;
+    }
+    if (ov.imageBehindText === true) entry.imageBehindText = true;
+    if (ov.fontSize != null && ov.fontSize !== '') {
+      const n = Number(ov.fontSize);
+      if (Number.isFinite(n)) entry.fontSize = n;
+    }
+    if (ov.markId !== undefined) entry.markId = ov.markId;
+    /* only list keys that actually override something */
+    if (Object.keys(entry).length > 1) perKeyInfo.push(entry);
   });
 
   const spec = {
-    formatVersion: 2,
+    formatVersion: 3,
     name: `MODKEYS ${L.pct} — ${cwName}`,
     generated: new Date().toISOString(),
     configurator: 'MODKEYS by nur',
@@ -80,6 +86,8 @@ export function generateSpec() {
 
     lighting: {
       mode: state.light.mode,
+      color: state.light.color,
+      brightness: state.light.bright,
       type: 'South-facing SMD RGB',
       supported: true,
     },
@@ -88,7 +96,7 @@ export function generateSpec() {
       pcb: 'GH60 compatible',
       usb: 'USB-C',
       dimensions: `${Math.round(L.total * 19.05)}mm x 95mm`,
-      notes: 'Custom image keys require dye-sublimation or UV printing (not doubleshot).',
+      notes: 'Custom image keys require dye-sublimation or UV printing (not doubleshot). Font sizes map 12–48 → KLE f 1–9 and SVG text scale.',
     },
 
     kleLayout: exportKLE(),

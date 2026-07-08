@@ -24,7 +24,16 @@ export function exportKLE() {
   const meta = {
     name: `MODKEYS ${L.pct} — ${cwName}`,
     author: 'MODKEYS Configurator',
-    notes: `Switch: ${state.sw} | Plate: ${state.plate} | Case: ${state.caseColor} | Profile: ${profileName}`,
+    notes: [
+      `Switch: ${state.sw}`,
+      `Plate: ${state.plate}`,
+      `Case: ${state.caseColor}`,
+      `Finish: ${state.finish}`,
+      `Material: ${state.material}`,
+      `Profile: ${profileName}`,
+      `Light: ${state.light.mode} ${state.light.color} @${state.light.bright}`,
+      'Per-key: c/t/f from overrides (font 12–48 → f 1–9)',
+    ].join(' | '),
   };
 
   const kleData = [meta];

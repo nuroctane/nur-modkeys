@@ -186,6 +186,17 @@ getCanvas().addEventListener('pointermove', (ev) => {
     ctrl.target.addScaledVector(right, -dx * f).addScaledVector(up, dy * f);
     return;
   }
+  /* While the key editor is open, freeze cap Y so the board doesn't
+     bob under the popover as the pointer moves. */
+  if (state.selectedKey) {
+    if (hoverCap) {
+      gsap.killTweensOf(hoverCap.position);
+      hoverCap.position.y = hoverCap.userData.baseY;
+      hoverCap = null;
+    }
+    return;
+  }
+
   const overKnob = knobGroup.visible && pick(knobGroup.children, ev);
   const hit = overKnob ? null : capOf(pick(capsGroup.children, ev));
   getCanvas().style.cursor = overKnob ? 'ew-resize' : hit ? 'pointer' : '';
@@ -202,6 +213,13 @@ getCanvas().addEventListener('pointermove', (ev) => {
   }
 });
 
+/** Snap a cap (and any active hover) to rest height — used when opening the editor. */
+function settleCap(cap) {
+  if (!cap) return;
+  gsap.killTweensOf(cap.position);
+  if (cap.userData && cap.userData.baseY != null) cap.position.y = cap.userData.baseY;
+}
+
 let lastClickKey = null, lastClickTime = 0;
 function endPointer(ev) {
   pointers.delete(ev.pointerId);
@@ -212,10 +230,21 @@ function endPointer(ev) {
     if (hit && !state.exploded) {
       const now = Date.now();
       if (hit === lastClickKey && now - lastClickTime < 350) {
+        /* Double-click → key editor: cancel the first-click press/hover
+           so the board stays still while the user edits. */
+        settleCap(hit);
+        if (hoverCap && hoverCap !== hit) settleCap(hoverCap);
+        hoverCap = null;
         state.selectedKey = hit.userData.perKeyId;
         if (onKeyEdit) onKeyEdit(hit.userData);
         lastClickKey = null;
         lastClickTime = 0;
+        return;
+      }
+      /* Don't press-animate while editor is already open (stable framing). */
+      if (state.selectedKey) {
+        lastClickKey = hit;
+        lastClickTime = now;
         return;
       }
       lastClickKey = hit;

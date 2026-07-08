@@ -1,11 +1,38 @@
 import { state } from '../core/state.js';
 import { LAYOUTS } from '../data/layouts.js';
 import { effectiveColorway } from '../core/update.js';
-import { getEffectiveText, getEffectiveFg, getEffectiveBg, getEffectiveFontSize, getOverride, keyId } from '../core/perKey.js';
+import {
+  getEffectiveText, getEffectiveFg, getEffectiveBg, getEffectiveFontSize,
+  hasGlow, hasImageBehindText, getEffectiveImage, keyId,
+} from '../core/perKey.js';
 import { exportKLE } from './kle.js';
 
 function escapeXml(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/** Map in-app legend font size (12–48, default 29) → SVG mm-ish text size. */
+function fontSizeMm(fs) {
+  const n = Number(fs);
+  const v = Number.isFinite(n) ? n : 29;
+  // 12 → ~3.2, 29 → ~6.2, 48 → ~9.5 (readable on 19.05mm unit keys)
+  return Math.round((3.2 + ((v - 12) * (9.5 - 3.2)) / 36) * 100) / 100;
+}
+
+function legendTexts(x, y, w, h, label, fg, fs, glow) {
+  const lines = String(label).split('\n').filter((l, i, a) => a.length > 1 || l.length >= 0);
+  const size = fontSizeMm(fs);
+  const lineH = size * 1.15;
+  const blockH = lines.length * lineH;
+  const startY = y + h / 2 - blockH / 2 + lineH * 0.72;
+  const cx = x + w / 2;
+  const style = glow
+    ? `fill="none" stroke="${fg}" stroke-width="${Math.max(0.35, size * 0.06)}" paint-order="stroke"`
+    : `fill="${fg}"`;
+  return lines.map((line, i) => {
+    const ty = startY + i * lineH;
+    return `<text x="${cx}" y="${ty}" text-anchor="middle" font-size="${size}" ${style}>${escapeXml(line)}</text>`;
+  }).join('');
 }
 
 export function generateSVG() {
@@ -17,7 +44,6 @@ export function generateSVG() {
 
   const UNIT = 19.05;
   const GAP = 0.4;
-  const KEY_W = UNIT - GAP;
   const KEY_H = UNIT - GAP;
   const K_R = 2;
   const PAD = 20;
@@ -42,7 +68,7 @@ export function generateSVG() {
 <metadata><![CDATA[${kleJson.replaceAll(']]>', ']]]]><![CDATA[>')}]]></metadata>
 <rect width="${svgW}" height="${svgH}" fill="#ffffff"/>
 <style>
-  text { font-family: Inter, Arial, sans-serif; font-weight: 600; fill: #000; }
+  text { font-family: Inter, "Segoe UI", Arial, sans-serif; font-weight: 700; }
   .k { stroke: #ccc; stroke-width: 0.3; }
 </style>
 <g transform="translate(${PAD},${PAD})">`;
@@ -57,22 +83,33 @@ export function generateSVG() {
       const w = kw * UNIT - GAP;
       const h = KEY_H;
       const id = keyId(ri, ci);
-      const ov = getOverride(id);
       const defaultBg = colorMap[k.r] || colorMap.a;
       const defaultFg = fgColorMap[k.r] || fgColorMap.a;
       const bg = getEffectiveBg(id, defaultBg);
       const fg = getEffectiveFg(id, defaultFg) || defaultFg;
+      const effectiveLabel = getEffectiveText(id, k.l);
+      const effectiveFs = getEffectiveFontSize(id, 29);
+      const glow = hasGlow(id);
+      const img = getEffectiveImage(id);
+      const imgBehind = hasImageBehindText(id);
 
       svg += `<rect class="k" x="${x}" y="${y}" width="${w}" height="${h}" rx="${K_R}" fill="${bg}" />`;
-      const effectiveLabel = getEffectiveText(id, k.l);
-      if (effectiveLabel) {
-        const lines = effectiveLabel.split('\n');
-        const fgStyle = ov && ov.glow ? `stroke="${fg}" stroke-width="0.5" fill="none"` : `fill="${fg}"`;
-        svg += `<text x="${x + w / 2}" y="${y + h / 2 + 3}" text-anchor="middle" dominant-baseline="middle" font-size="7" ${fgStyle}>${lines.map(l => escapeXml(l)).join('</text><text x="' + (x + w / 2) + '" y="' + (y + h / 2 + 3) + '" text-anchor="middle" dominant-baseline="middle" font-size="7" ' + fgStyle + '>')}</text>`;
+
+      /* Match 3D legendTex layering:
+         - image only (no text) when image set and not imageBehindText
+         - image under text when imageBehindText
+         - text only otherwise */
+      if (img && imgBehind) {
+        svg += `<image x="${x + 1.5}" y="${y + 1.5}" width="${w - 3}" height="${h - 3}" preserveAspectRatio="xMidYMid meet" href="${escapeXml(img)}" opacity="0.92"/>`;
+        if (effectiveLabel) {
+          svg += legendTexts(x, y, w, h, effectiveLabel, fg, effectiveFs, glow);
+        }
+      } else if (img && !imgBehind) {
+        svg += `<image x="${x + 1.5}" y="${y + 1.5}" width="${w - 3}" height="${h - 3}" preserveAspectRatio="xMidYMid meet" href="${escapeXml(img)}" opacity="1"/>`;
+      } else if (effectiveLabel) {
+        svg += legendTexts(x, y, w, h, effectiveLabel, fg, effectiveFs, glow);
       }
-      if (ov && ov.imageData) {
-        svg += `<image x="${x + 2}" y="${y + 2}" width="${w - 4}" height="${h - 4}" preserveAspectRatio="xMidYMid meet" href="${escapeXml(ov.imageData)}" opacity="0.3"/>`;
-      }
+
       cur = start + kw;
     });
   });
