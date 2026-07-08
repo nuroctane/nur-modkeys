@@ -24,6 +24,7 @@ import { exportPDF } from './export/pdf.js';
 import { loadHash, shareURL } from './core/shrinker.js';
 import { clearAllOverrides } from './core/perKey.js';
 import { resetHistory, canUndo, canRedo } from './core/history.js';
+import { trackEvent } from './core/analytics.js';
 
 let animationId = null;
 let cleanupFns = [];
@@ -82,17 +83,21 @@ export function mountModkeys() {
       img: renderer.domElement.toDataURL('image/png'),
     });
     toast('Build saved. Find it under Gallery.');
+    let sync = 'local';
     try {
       const res = await fetch('/api/modkeys/gallery', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, snap: stateSliceWithoutImages() }),
       });
-      if (res.ok) toast('Synced to community gallery');
-      else toast('Saved locally (gallery offline)');
+      if (res.ok) {
+        toast('Synced to community gallery');
+        sync = 'gallery';
+      } else toast('Saved locally (gallery offline)');
     } catch {
       toast('Saved locally (gallery offline)');
     }
+    trackEvent('Modkeys Save', { layout: state.layout, sync });
   });
 
   /* view pills */
@@ -127,20 +132,35 @@ export function mountModkeys() {
   });
   document.getElementById('toolShare')?.addEventListener('click', () => {
     const url = shareURL(stateSlice());
-    if (url) { navigator.clipboard.writeText(url); toast('Share link copied!'); }
-    else toast('Could not create share link');
+    if (url) {
+      navigator.clipboard.writeText(url);
+      toast('Share link copied!');
+      trackEvent('Modkeys Share', { layout: state.layout });
+    } else toast('Could not create share link');
   });
 
   /* export buttons */
-  document.getElementById('exportKLE').addEventListener('click', downloadKLE);
-  document.getElementById('exportSVG').addEventListener('click', downloadSVG);
-  document.getElementById('exportSpec').addEventListener('click', downloadSpec);
+  document.getElementById('exportKLE').addEventListener('click', () => {
+    downloadKLE();
+    trackEvent('Modkeys Export', { format: 'kle', layout: state.layout });
+  });
+  document.getElementById('exportSVG').addEventListener('click', () => {
+    downloadSVG();
+    trackEvent('Modkeys Export', { format: 'svg', layout: state.layout });
+  });
+  document.getElementById('exportSpec').addEventListener('click', () => {
+    downloadSpec();
+    trackEvent('Modkeys Export', { format: 'spec', layout: state.layout });
+  });
   document.getElementById('copyKLE')?.addEventListener('click', () => {
     copyKLE();
     toast('KLE layout copied to clipboard');
+    trackEvent('Modkeys Export', { format: 'kle_copy', layout: state.layout });
   });
   document.getElementById('exportPDF')?.addEventListener('click', () => {
-    exportPDF().catch(() => toast('PDF export failed'));
+    exportPDF()
+      .then(() => trackEvent('Modkeys Export', { format: 'pdf', layout: state.layout }))
+      .catch(() => toast('PDF export failed'));
   });
 
   /* theme */
