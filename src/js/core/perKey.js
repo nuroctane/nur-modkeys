@@ -27,6 +27,24 @@ export function clearAllOverrides() {
   Object.keys(store()).forEach((k) => delete store()[k]);
 }
 
+/**
+ * Strip per-key face/legend colours so global colorway / customColors can show.
+ * Keeps images, emoji, custom text, glow, font size, fit, etc.
+ * @returns {boolean} true if anything was removed
+ */
+export function clearPerKeyCapColors() {
+  const map = store();
+  let changed = false;
+  Object.keys(map).forEach((id) => {
+    const o = map[id];
+    if (!o) return;
+    if (o.bgColor !== undefined) { delete o.bgColor; changed = true; }
+    if (o.fgColor !== undefined) { delete o.fgColor; changed = true; }
+    if (!Object.keys(o).length) delete map[id];
+  });
+  return changed;
+}
+
 export function getOverride(id) {
   return store()[id] || null;
 }

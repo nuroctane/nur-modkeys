@@ -47,6 +47,12 @@ function presetPatch(p) {
     sw: s.sw || state.sw,
     light: s.light ? Object.assign({}, state.light, s.light) : state.light,
     selectedPreset: p.id,
+    /* wipe photo-match leftovers when loading a stock preset */
+    perKeyOverrides: s.perKeyOverrides || {},
+    customColors: s.customColors ?? null,
+    caseCustomColor: s.caseCustomColor ?? null,
+    plateColor: s.plateColor ?? null,
+    switchColor: s.switchColor ?? null,
   });
 }
 
@@ -234,7 +240,7 @@ $('modalBody')?.addEventListener('click', (ev) => {
   const gal = ev.target.closest('[data-gal]');
   if (gal) {
     const p = PRESETS.find((x) => x.id === gal.dataset.gal);
-    setState(presetPatch(p));
+    loadSnap(presetPatch(p), { selectedPreset: p.id });
     closeModal();
     toast(p.name + ' loaded');
     return;

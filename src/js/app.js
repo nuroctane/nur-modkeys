@@ -191,9 +191,8 @@ export function mountModkeys() {
     if (!card) return;
     const p = PRESETS.find((x) => x.id === card.dataset.id);
     if (!p) return;
-    const patch = Object.assign({}, p.s, { selectedPreset: p.id });
-    if (patch.colorway) state.colorway = patch.colorway;
-    setState(patch);
+    /* loadSnap clears leftover photo per-key colours / custom board tints */
+    loadSnap(Object.assign({}, p.s), { selectedPreset: p.id });
     toast(p.name + ' loaded');
   });
 

@@ -12,6 +12,7 @@ import {
 import { rebuildBoard, buildKeys, refreshLegends, preloadEmoji } from './keyboard.js';
 import { setView } from './controls.js';
 import { pushState, undo as undoHistory, redo as redoHistory } from './history.js';
+import { clearPerKeyCapColors } from './perKey.js';
 
 /* Panel re-render hook. panels.js statically imports this module, so a static
    import back would be circular; app.js (which imports both) registers the
@@ -67,9 +68,25 @@ function hasCustomColors(cc) {
  * Prefer customColors over named colorway when both appear in a snap
  * (photo match leaves colorway id set while roles live in customColors).
  * Explicit customColors: null + colorway chip clears custom and applies stock.
+ *
+ * Global colorway / customColors changes strip per-key bg/fg (photo match)
+ * unless the patch also carries perKeyOverrides (full snap load restores them).
  */
 function applyColorwayFields(s, { instant = true } = {}) {
   if (s.brand !== undefined) state.brand = s.brand;
+
+  const applyingGlobalColors =
+    hasCustomColors(s.customColors) ||
+    (s.colorway && COLORWAYS[s.colorway]) ||
+    s.customColors === null;
+  /* Only strip when this patch is a global recolour, not a full snap that
+     already includes its own perKeyOverrides (photo gallery load). */
+  const stripPhotoCaps =
+    applyingGlobalColors && s.perKeyOverrides === undefined;
+  let strippedCaps = false;
+  if (stripPhotoCaps) {
+    strippedCaps = clearPerKeyCapColors();
+  }
 
   if (hasCustomColors(s.customColors)) {
     if (instant) applyColors(s.customColors);
@@ -80,8 +97,9 @@ function applyColorwayFields(s, { instant = true } = {}) {
     }
     state.customColors = s.customColors;
     if (s.colorway && COLORWAYS[s.colorway]) state.colorway = s.colorway;
-    if (instant) refreshLegends();
-    else gsap.delayedCall(0.26, refreshLegends);
+    if (strippedCaps && instant) buildKeys();
+    else if (instant) refreshLegends();
+    else gsap.delayedCall(0.26, strippedCaps ? buildKeys : refreshLegends);
     if (instant && panelRenderHook) panelRenderHook(state.section);
     return;
   }
@@ -99,8 +117,9 @@ function applyColorwayFields(s, { instant = true } = {}) {
     if (s.customColors === null || s.customColors === undefined) {
       state.customColors = null;
     }
-    if (instant) refreshLegends();
-    else gsap.delayedCall(0.26, refreshLegends);
+    if (strippedCaps && instant) buildKeys();
+    else if (instant) refreshLegends();
+    else gsap.delayedCall(0.26, strippedCaps ? buildKeys : refreshLegends);
     if (instant && panelRenderHook) panelRenderHook(state.section);
     return;
   }
@@ -116,8 +135,9 @@ function applyColorwayFields(s, { instant = true } = {}) {
         tweenColor(matAccent, cw.x.bg);
       }
     }
-    if (instant) refreshLegends();
-    else gsap.delayedCall(0.26, refreshLegends);
+    if (strippedCaps && instant) buildKeys();
+    else if (instant) refreshLegends();
+    else gsap.delayedCall(0.26, strippedCaps ? buildKeys : refreshLegends);
     return;
   }
 
@@ -292,6 +312,12 @@ export function loadSnap(snap, opts = {}) {
   const patch = Object.assign({}, snap);
   if (opts.selectedPreset !== undefined) patch.selectedPreset = opts.selectedPreset;
   else if (patch.selectedPreset === undefined) patch.selectedPreset = null;
+  /* Full snap: missing overrides must clear leftover photo colours from prior build */
+  if (patch.perKeyOverrides === undefined) patch.perKeyOverrides = {};
+  if (patch.customColors === undefined) patch.customColors = null;
+  if (patch.caseCustomColor === undefined) patch.caseCustomColor = null;
+  if (patch.plateColor === undefined) patch.plateColor = null;
+  if (patch.switchColor === undefined) patch.switchColor = null;
   setState(patch, { animate: false, skipPanel: !!opts.skipPanel });
 }
 
