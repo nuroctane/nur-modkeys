@@ -15,7 +15,8 @@ import { toast } from './toast.js';
 import {
   loadPhotoFile, hasPhotoSession, photoPreviewUrl,
   copyColorsFromPhoto, setCornerFromPreview, cornersInPreview, clearPhotoSession,
-  analyzePhotoSession, photoRolesStatePatch, getPhotoMatchMeta,
+  analyzePhotoSession, photoRolesStatePatch, photoPartStatePatch,
+  getPhotoMatchMeta, getPhotoApply, setPhotoApply,
 } from '../core/photoMatch.js';
 
 function effectiveCaseHex() {
@@ -237,25 +238,48 @@ function buildCustomizePanel() {
   const hasPhoto = hasPhotoSession();
 
   const meta = hasPhoto ? getPhotoMatchMeta() : null;
-  const roleStrip = meta?.assign
+  const apply = getPhotoApply();
+  const a = meta?.assign;
+  const roleStrip = a
     ? `<div class="photoRoleStrip" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
         ${[
-          ['α', meta.assign.alpha],
-          ['mod', meta.assign.mod],
-          ['acc', meta.assign.accent],
-          ['case', meta.assign.caseC],
-          ['glow', meta.assign.glow],
+          ['α', a.alpha],
+          ['mod', a.mod],
+          ['acc', a.accent],
+          ['case', a.caseC],
+          ['plate', a.plate],
+          ['sw', a.switch],
+          ['glow', a.glow],
         ].map(([lab, hex]) =>
           `<span title="${lab}" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;opacity:.85">
-            <i style="display:inline-block;width:12px;height:12px;border-radius:2px;background:${escAttr(hex)};border:1px solid var(--card2)"></i>${lab}
+            <i style="display:inline-block;width:12px;height:12px;border-radius:2px;background:${escAttr(hex || '#888')};border:1px solid var(--card2)"></i>${lab}
           </span>`).join('')}
       </div>`
     : '';
 
+  const photoToggleRow = (id, label, hex) => `
+  <label class="keRow" style="margin-top:6px">
+    <span style="display:inline-flex;align-items:center;gap:6px;flex:1;min-width:0">
+      <i style="display:inline-block;width:14px;height:14px;border-radius:3px;background:${escAttr(hex || '#888')};border:1px solid var(--card2);flex-shrink:0"></i>
+      ${label}
+    </span>
+    <label class="keToggle ${apply[id] ? 'on' : ''}" id="photoApply_${id}" data-photo-apply="${id}"><span></span></label>
+  </label>`;
+
+  const boardToggles = a ? `
+  <div class="glabel" style="margin-top:12px">BOARD FROM PHOTO</div>
+  <div class="hint">Toggle which parts take colours from the photo (same as keys). On = apply / re-apply on copy.</div>
+  ${photoToggleRow('case', 'Case', a.caseC)}
+  ${photoToggleRow('plate', 'Plate', a.plate)}
+  ${photoToggleRow('light', 'Light', a.glow)}
+  ${photoToggleRow('switch', 'Switch', a.switch)}
+  ${photoToggleRow('keys', 'Keycaps', a.alpha)}
+  ` : '';
+
   let html = `
 <div class="grp">
   <div class="glabel">MATCH A PHOTO</div>
-  <div class="hint">Upload a keyboard photo — we detect the board, seed the key field, pull a palette, then copy every key. Drag corners to fine-tune.</div>
+  <div class="hint">Upload a keyboard photo — we detect the board, seed the key field, pull a palette, then copy keys + board parts. Drag corners to fine-tune.</div>
   <label class="libBtn" style="display:inline-flex;align-items:center;justify-content:center;cursor:pointer;margin-top:6px">
     Upload photo…
     <input type="file" id="photoMatchFile" accept="image/png,image/jpeg,image/webp" style="display:none">
@@ -266,6 +290,7 @@ function buildCustomizePanel() {
     <div id="photoMatchHandles" class="photoMatchHandles"></div>
   </div>
   ${roleStrip}
+  ${boardToggles}
   <button type="button" class="libBtn" id="photoCopyAll" style="margin-top:8px">Copy every key</button>
   <button type="button" class="libBtn" id="photoCopySel" style="margin-top:4px">Copy selected only</button>
   <button type="button" class="libBtn" id="photoRecopy" style="margin-top:4px">Re-copy from photo</button>
@@ -448,18 +473,29 @@ function afterPhotoCopy(msg) {
   Object.keys(state.perKeyOverrides || {}).forEach((id) => {
     if (state.perKeyOverrides[id]?.bgColor) rebuildKey(...id.split('-').map(Number));
   });
+  refreshChromeDots();
   toast(msg || 'Colours copied from photo');
   renderPanel('customize');
 }
 
-/** Apply k-means roles (customColors / case / light) then optional full key trace. */
+/** Apply k-means roles (board toggles) then optional per-key median copy. */
 function applyPhotoMatchPipeline({ recopy = true, onlySelected = false } = {}) {
+  const apply = getPhotoApply();
   const patch = photoRolesStatePatch();
-  if (patch) {
-    setState(patch, { skipPanel: true, animate: false });
-  }
-  if (!recopy) return 0;
+  if (patch) setState(patch, { skipPanel: true, animate: false });
+  if (!recopy || !apply.keys) return patch ? 1 : 0;
   return copyColorsFromPhoto({ autoLegend: true, onlySelected });
+}
+
+function refreshChromeDots() {
+  const dp = $('dotPlate');
+  if (dp) dp.style.background = state.plateColor || PLATES[state.plate].c;
+  const dc = $('dotCase');
+  if (dc) dc.style.background = state.caseCustomColor || CASES[state.caseColor].c;
+  const ds = $('dotSwitches');
+  if (ds) ds.style.background = state.switchColor || SWITCHES[state.sw].dot;
+  const dl = $('dotLight');
+  if (dl) dl.style.cssText = lightDotStyle();
 }
 export function setupPanelEvents() {
   const panelBody = $('panelBody');
@@ -626,18 +662,55 @@ export function setupPanelEvents() {
       renderPanel('customize');
       return;
     }
+    const photoApplyEl = ev.target.closest('[data-photo-apply]');
+    if (photoApplyEl) {
+      const part = photoApplyEl.dataset.photoApply;
+      if (!part) return;
+      const cur = getPhotoApply();
+      const next = !cur[part];
+      setPhotoApply({ [part]: next });
+      photoApplyEl.classList.toggle('on', next);
+      if (next && hasPhotoSession()) {
+        if (part === 'keys') {
+          const n = copyColorsFromPhoto({ autoLegend: true, onlySelected: false });
+          if (n) {
+            Object.keys(state.perKeyOverrides || {}).forEach((id) => {
+              if (state.perKeyOverrides[id]?.bgColor) rebuildKey(...id.split('-').map(Number));
+            });
+            toast('Key colours from photo');
+          }
+        } else {
+          const patch = photoPartStatePatch(part);
+          if (patch) {
+            setState(patch, { skipPanel: true, animate: false });
+            refreshChromeDots();
+            toast(`${part.charAt(0).toUpperCase() + part.slice(1)} colour from photo`);
+          }
+        }
+      } else if (!next) {
+        toast(`${part.charAt(0).toUpperCase() + part.slice(1)} photo match off`);
+      }
+      return;
+    }
     if (ev.target.id === 'photoCopyAll' || ev.target.id === 'photoRecopy') {
       if (!hasPhotoSession()) { toast('Load a photo first'); return; }
       const n = applyPhotoMatchPipeline({ recopy: true, onlySelected: false });
-      if (n) afterPhotoCopy(ev.target.id === 'photoRecopy'
-        ? 'Re-copied from photo'
-        : 'Board copied — drag corners to fine-tune');
-      else toast('Could not sample keys');
+      refreshChromeDots();
+      if (n || getPhotoApply().case || getPhotoApply().plate) {
+        afterPhotoCopy(ev.target.id === 'photoRecopy'
+          ? 'Re-copied from photo'
+          : 'Board copied — drag corners to fine-tune');
+      } else toast('Nothing to apply — turn on toggles or load a photo');
       return;
     }
     if (ev.target.id === 'photoCopySel') {
       if (!hasPhotoSession()) { toast('Load a photo first'); return; }
+      if (!getPhotoApply().keys) {
+        toast('Turn on Keycaps toggle first');
+        return;
+      }
       const n = applyPhotoMatchPipeline({ recopy: true, onlySelected: true });
+      refreshChromeDots();
       if (n) afterPhotoCopy(`Copied ${n} selected key${n > 1 ? 's' : ''}`);
       else toast('Select keys first');
       return;
@@ -651,7 +724,8 @@ export function setupPanelEvents() {
         return;
       }
       const n = applyPhotoMatchPipeline({ recopy: true, onlySelected: false });
-      if (n) afterPhotoCopy('Auto-fit + colours applied');
+      refreshChromeDots();
+      if (n || photoRolesStatePatch()) afterPhotoCopy('Auto-fit + colours applied');
       else {
         toast('Board re-detected — drag corners then copy');
         renderPanel('customize');
@@ -728,7 +802,8 @@ export function setupPanelEvents() {
       try {
         await loadPhotoFile(file);
         const n = applyPhotoMatchPipeline({ recopy: true, onlySelected: false });
-        if (n) {
+        refreshChromeDots();
+        if (n || getPhotoMatchMeta()?.assign) {
           afterPhotoCopy('Board copied — drag corners to fine-tune the fit');
         } else {
           toast('Photo loaded — drag corners, then Copy every key');

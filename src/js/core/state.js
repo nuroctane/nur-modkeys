@@ -29,6 +29,17 @@ const state = {
   multiSelectMode: false,
   customColors: null,
   perKeyOverrides: {},
+  /**
+   * Customize photo-match: which board parts adopt colours from the photo.
+   * keys = per-key median copy; case/plate/light/switch = role tints.
+   */
+  photoMatchApply: {
+    keys: true,
+    case: true,
+    plate: true,
+    light: true,
+    switch: true,
+  },
 };
 
 export { state };

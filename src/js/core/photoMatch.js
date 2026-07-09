@@ -24,12 +24,38 @@ let session = null;
  *   w: number,
  *   h: number,
  *   corners: {x:number,y:number}[],
- *   assign: { alpha:string, mod:string, accent:string, caseC:string, glow:string } | null,
+ *   assign: {
+ *     alpha:string, mod:string, accent:string,
+ *     caseC:string, glow:string, plate:string, switch:string,
+ *   } | null,
  *   palette: string[],
  *   boardBox: number[] | null,
  *   keyBox: number[] | null,
  * }} PhotoSession
  */
+
+/** Default which board parts adopt photo colours (Customize toggles). */
+export const DEFAULT_PHOTO_APPLY = {
+  keys: true,
+  case: true,
+  plate: true,
+  light: true,
+  switch: true,
+};
+
+export function getPhotoApply() {
+  if (!state.photoMatchApply) {
+    state.photoMatchApply = { ...DEFAULT_PHOTO_APPLY };
+  }
+  return state.photoMatchApply;
+}
+
+export function setPhotoApply(partial) {
+  const cur = getPhotoApply();
+  Object.assign(cur, partial || {});
+  state.photoMatchApply = cur;
+  return cur;
+}
 
 export function getPhotoSession() {
   return session;
@@ -432,7 +458,49 @@ function extractPalette(data, w, h, box, k = 7) {
   return merged;
 }
 
-function autoAssign(pal) {
+/**
+ * Median colour of the rim between board box and keycap field —
+ * usually plate / mounting rail, not outer case bezel.
+ */
+function samplePlateFromFrame(data, w, h, boardBox, keyBox) {
+  const bx0 = Math.floor(boardBox[0] * w);
+  const by0 = Math.floor(boardBox[1] * h);
+  const bx1 = Math.ceil(boardBox[2] * w);
+  const by1 = Math.ceil(boardBox[3] * h);
+  const kx0 = Math.floor(keyBox[0] * w);
+  const ky0 = Math.floor(keyBox[1] * h);
+  const kx1 = Math.ceil(keyBox[2] * w);
+  const ky1 = Math.ceil(keyBox[3] * h);
+  const rv = [];
+  const gv = [];
+  const bv = [];
+  const step = Math.max(1, Math.round(Math.min(w, h) / 80));
+  for (let y = by0; y <= by1; y += step) {
+    for (let x = bx0; x <= bx1; x += step) {
+      const inKey = x >= kx0 && x <= kx1 && y >= ky0 && y <= ky1;
+      if (inKey) continue;
+      const i = (y * w + x) * 4;
+      if (data[i + 3] < 128) continue;
+      rv.push(data[i]);
+      gv.push(data[i + 1]);
+      bv.push(data[i + 2]);
+    }
+  }
+  if (rv.length < 8) return null;
+  const med = (a) => {
+    const t = a.slice().sort((p, q) => p - q);
+    return t[t.length >> 1];
+  };
+  return rgbHex(med(rv), med(gv), med(bv));
+}
+
+function hexDist(a, b) {
+  const [r1, g1, b1] = hexToRgb(a);
+  const [r2, g2, b2] = hexToRgb(b);
+  return Math.abs(r1 - r2) + Math.abs(g1 - g2) + Math.abs(b1 - b2);
+}
+
+function autoAssign(pal, framePlateHex) {
   if (!pal.length) {
     return {
       alpha: '#cccccc',
@@ -440,6 +508,8 @@ function autoAssign(pal) {
       accent: '#cc785c',
       caseC: '#2a2a2e',
       glow: '#cc785c',
+      plate: '#8a7a55',
+      switch: '#cc785c',
     };
   }
   const caseScore = (c) =>
@@ -464,12 +534,32 @@ function autoAssign(pal) {
     rest3.slice().sort((a, b) => b.center - a.center)[0] ||
     rest3[0] ||
     alpha;
+
+  /* plate: prefer measured rim; else mid-luma palette colour ≠ case/alpha */
+  let plateHex = framePlateHex;
+  if (!plateHex || hexDist(plateHex, caseC.hex) < 22) {
+    const plateCand = pal
+      .filter((c) => c !== caseC && c !== alpha)
+      .slice()
+      .sort((a, b) => {
+        const midA = 1 - Math.abs(a.lum - 0.45);
+        const midB = 1 - Math.abs(b.lum - 0.45);
+        return midB - midA;
+      })[0];
+    plateHex = plateCand?.hex || mod.hex || caseC.hex;
+  }
+
+  /* switch stem: vivid accent, else most saturated remaining */
+  const switchHex = accent.hex;
+
   return {
     alpha: alpha.hex,
     mod: mod.hex,
     accent: accent.hex,
     caseC: caseC.hex,
     glow: accent.hex,
+    plate: plateHex,
+    switch: switchHex,
   };
 }
 
@@ -578,8 +668,11 @@ export function analyzePhotoSession() {
     session.corners = defaultCorners(session.w, session.h);
     return null;
   }
-  const assign = autoAssign(pal);
-  const keyBox = detectKeycapBox(data, w, h, boardBox, assign.caseC);
+  /* provisional case for keycap shrink, then full assign with plate rim */
+  const provisional = autoAssign(pal, null);
+  const keyBox = detectKeycapBox(data, w, h, boardBox, provisional.caseC);
+  const framePlate = samplePlateFromFrame(data, w, h, boardBox, keyBox);
+  const assign = autoAssign(pal, framePlate);
   session.boardBox = boardBox;
   session.keyBox = keyBox;
   session.assign = assign;
@@ -624,28 +717,76 @@ export function setCorners(corners) {
 }
 
 /**
- * State patch to apply palette roles (customColors + case + light + finish).
- * Caller should setState(patch).
+ * State patch for photo roles / board parts.
+ * Honours state.photoMatchApply toggles (case / plate / light / switch).
+ * Keycap customColors always applied as base when any role is present.
+ * @param {{ force?: Partial<typeof DEFAULT_PHOTO_APPLY> }} [opts]
  */
-export function photoRolesStatePatch() {
+export function photoRolesStatePatch(opts = {}) {
   const a = session?.assign;
   if (!a) return null;
+  const apply = { ...getPhotoApply(), ...(opts.force || {}) };
   const soft = lumaOfHex(a.caseC) < 0.45;
-  return {
+  const patch = {
     customColors: {
       a: { bg: a.alpha, fg: legendFor(a.alpha) },
       m: { bg: a.mod, fg: legendFor(a.mod) },
       x: { bg: a.accent, fg: legendFor(a.accent) },
     },
-    caseCustomColor: a.caseC,
     selectedPreset: null,
-    finish: soft ? 'softtouch' : state.finish,
-    light: {
+  };
+  if (apply.case) {
+    patch.caseCustomColor = a.caseC;
+    if (soft) patch.finish = 'softtouch';
+  }
+  if (apply.plate && a.plate) {
+    patch.plateColor = a.plate;
+  }
+  if (apply.switch && a.switch) {
+    patch.switchColor = a.switch;
+  }
+  if (apply.light) {
+    patch.light = {
       color: a.glow,
       mode: state.light.mode === 'off' ? 'static' : state.light.mode,
       bright: state.light.bright,
-    },
-  };
+    };
+  }
+  return patch;
+}
+
+/**
+ * Single-part patch when a Customize toggle is turned on.
+ * @param {'case'|'plate'|'light'|'switch'} part
+ */
+export function photoPartStatePatch(part) {
+  const a = session?.assign;
+  if (!a) return null;
+  if (part === 'case') {
+    const soft = lumaOfHex(a.caseC) < 0.45;
+    return {
+      caseCustomColor: a.caseC,
+      ...(soft ? { finish: 'softtouch' } : {}),
+      selectedPreset: null,
+    };
+  }
+  if (part === 'plate') {
+    return { plateColor: a.plate || a.mod, selectedPreset: null };
+  }
+  if (part === 'switch') {
+    return { switchColor: a.switch || a.accent, selectedPreset: null };
+  }
+  if (part === 'light') {
+    return {
+      light: {
+        color: a.glow,
+        mode: state.light.mode === 'off' ? 'static' : state.light.mode,
+        bright: state.light.bright,
+      },
+      selectedPreset: null,
+    };
+  }
+  return null;
 }
 
 /**
