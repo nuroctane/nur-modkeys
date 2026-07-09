@@ -54,7 +54,7 @@ A browser-based mechanical keyboard configurator and 3D visualization tool. Buil
 
 ```
 index.html              Main SPA — desktop shell + mobile template
-MOBILE_SHELL.md         Dual-shell architecture notes
+.agents/docs/MOBILE_SHELL.md   Dual-shell architecture notes
 check-shell-ids.mjs     ID parity checker (desktop ↔ mobile)
 check-spa-shell.mjs     SPA shell integrity check
 src/
@@ -121,7 +121,7 @@ On phones and tablets a dedicated mobile shell swaps in at boot (`matchMedia`). 
 - **Save / Export** in a fixed bottom bar; Export opens a sheet (KLE, SVG, PDF, spec)
 - **Material sounds** on key tap (PBT thock; ABS/Ceramic add resonance)
 - **Safe-area + `dvh`** for notches and home bars
-- **Breakpoint**: `(max-width: 768px)` or coarse pointer up to `1024px`. Crossing reloads so the correct shell binds (see `MOBILE_SHELL.md`)
+- **Breakpoint**: `(max-width: 768px)` or coarse pointer up to `1024px`. Crossing reloads so the correct shell binds (see `.agents/docs/MOBILE_SHELL.md`)
 
 ### Per-key Customization
 Double-click a key (desktop) to open the key editor — text, colors, glow, images.
