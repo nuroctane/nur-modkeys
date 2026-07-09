@@ -15,6 +15,7 @@ import { toast } from './toast.js';
 import {
   loadPhotoFile, hasPhotoSession, photoPreviewUrl,
   copyColorsFromPhoto, setCornerFromPreview, cornersInPreview, clearPhotoSession,
+  analyzePhotoSession, photoRolesStatePatch, getPhotoMatchMeta,
 } from '../core/photoMatch.js';
 
 function effectiveCaseHex() {
@@ -235,10 +236,26 @@ function buildCustomizePanel() {
   const fit = ov.imageFit || (ov.imageBehindText ? 'fill' : 'wrap');
   const hasPhoto = hasPhotoSession();
 
+  const meta = hasPhoto ? getPhotoMatchMeta() : null;
+  const roleStrip = meta?.assign
+    ? `<div class="photoRoleStrip" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+        ${[
+          ['α', meta.assign.alpha],
+          ['mod', meta.assign.mod],
+          ['acc', meta.assign.accent],
+          ['case', meta.assign.caseC],
+          ['glow', meta.assign.glow],
+        ].map(([lab, hex]) =>
+          `<span title="${lab}" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;opacity:.85">
+            <i style="display:inline-block;width:12px;height:12px;border-radius:2px;background:${escAttr(hex)};border:1px solid var(--card2)"></i>${lab}
+          </span>`).join('')}
+      </div>`
+    : '';
+
   let html = `
 <div class="grp">
   <div class="glabel">MATCH A PHOTO</div>
-  <div class="hint">Copy key colours from a keyboard photo or art image. Drag the four corners to fit, then copy.</div>
+  <div class="hint">Upload a keyboard photo — we detect the board, seed the key field, pull a palette, then copy every key. Drag corners to fine-tune.</div>
   <label class="libBtn" style="display:inline-flex;align-items:center;justify-content:center;cursor:pointer;margin-top:6px">
     Upload photo…
     <input type="file" id="photoMatchFile" accept="image/png,image/jpeg,image/webp" style="display:none">
@@ -248,9 +265,11 @@ function buildCustomizePanel() {
     <img id="photoMatchImg" class="photoMatchImg" src="${photoPreviewUrl()}" alt="Photo match" draggable="false">
     <div id="photoMatchHandles" class="photoMatchHandles"></div>
   </div>
+  ${roleStrip}
   <button type="button" class="libBtn" id="photoCopyAll" style="margin-top:8px">Copy every key</button>
   <button type="button" class="libBtn" id="photoCopySel" style="margin-top:4px">Copy selected only</button>
   <button type="button" class="libBtn" id="photoRecopy" style="margin-top:4px">Re-copy from photo</button>
+  <button type="button" class="libBtn" id="photoAutofit" style="margin-top:4px">Auto-fit board</button>
   <button type="button" class="keBtn" id="photoClear" style="margin-top:4px">Clear photo</button>
   ` : ''}
 </div>
@@ -425,12 +444,22 @@ function mountPhotoHandles() {
   };
 }
 
-function afterPhotoCopy() {
+function afterPhotoCopy(msg) {
   Object.keys(state.perKeyOverrides || {}).forEach((id) => {
     if (state.perKeyOverrides[id]?.bgColor) rebuildKey(...id.split('-').map(Number));
   });
-  toast('Colours copied from photo');
+  toast(msg || 'Colours copied from photo');
   renderPanel('customize');
+}
+
+/** Apply k-means roles (customColors / case / light) then optional full key trace. */
+function applyPhotoMatchPipeline({ recopy = true, onlySelected = false } = {}) {
+  const patch = photoRolesStatePatch();
+  if (patch) {
+    setState(patch, { skipPanel: true, animate: false });
+  }
+  if (!recopy) return 0;
+  return copyColorsFromPhoto({ autoLegend: true, onlySelected });
 }
 export function setupPanelEvents() {
   const panelBody = $('panelBody');
@@ -597,19 +626,36 @@ export function setupPanelEvents() {
       renderPanel('customize');
       return;
     }
-    if (ev.target.id === 'photoCopyAll') {
-      const n = copyColorsFromPhoto({ autoLegend: true, onlySelected: false });
-      if (n) afterPhotoCopy();
-      else toast('Load a photo first');
+    if (ev.target.id === 'photoCopyAll' || ev.target.id === 'photoRecopy') {
+      if (!hasPhotoSession()) { toast('Load a photo first'); return; }
+      const n = applyPhotoMatchPipeline({ recopy: true, onlySelected: false });
+      if (n) afterPhotoCopy(ev.target.id === 'photoRecopy'
+        ? 'Re-copied from photo'
+        : 'Board copied — drag corners to fine-tune');
+      else toast('Could not sample keys');
       return;
     }
-    if (ev.target.id === 'photoCopySel' || ev.target.id === 'photoRecopy') {
-      const n = copyColorsFromPhoto({
-        autoLegend: true,
-        onlySelected: ev.target.id === 'photoCopySel',
-      });
-      if (n) afterPhotoCopy();
-      else toast(ev.target.id === 'photoCopySel' ? 'Select keys first' : 'Load a photo first');
+    if (ev.target.id === 'photoCopySel') {
+      if (!hasPhotoSession()) { toast('Load a photo first'); return; }
+      const n = applyPhotoMatchPipeline({ recopy: true, onlySelected: true });
+      if (n) afterPhotoCopy(`Copied ${n} selected key${n > 1 ? 's' : ''}`);
+      else toast('Select keys first');
+      return;
+    }
+    if (ev.target.id === 'photoAutofit') {
+      if (!hasPhotoSession()) { toast('Load a photo first'); return; }
+      const res = analyzePhotoSession();
+      if (!res) {
+        toast("Couldn't re-detect the board");
+        renderPanel('customize');
+        return;
+      }
+      const n = applyPhotoMatchPipeline({ recopy: true, onlySelected: false });
+      if (n) afterPhotoCopy('Auto-fit + colours applied');
+      else {
+        toast('Board re-detected — drag corners then copy');
+        renderPanel('customize');
+      }
       return;
     }
     if (ev.target.id === 'photoClear') {
@@ -681,8 +727,13 @@ export function setupPanelEvents() {
       if (!file) return;
       try {
         await loadPhotoFile(file);
-        toast('Photo loaded — drag corners, then Copy every key');
-        renderPanel('customize');
+        const n = applyPhotoMatchPipeline({ recopy: true, onlySelected: false });
+        if (n) {
+          afterPhotoCopy('Board copied — drag corners to fine-tune the fit');
+        } else {
+          toast('Photo loaded — drag corners, then Copy every key');
+          renderPanel('customize');
+        }
       } catch {
         toast('Could not load photo');
       }

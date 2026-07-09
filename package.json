@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-                    "build": "node --check src/js/app.js && node --check src/js/ui/panels.js && node --check src/js/ui/modals.js && node --check src/js/export/kle.js && node --check src/js/export/svg.js && node --check src/js/export/pdf.js && node --check src/js/export/spec.js",
+                    "build": "node --check src/js/app.js && node --check src/js/ui/panels.js && node --check src/js/ui/modals.js && node --check src/js/core/photoMatch.js && node --check src/js/export/kle.js && node --check src/js/export/svg.js && node --check src/js/export/pdf.js && node --check src/js/export/spec.js",
     "preview": "vite preview"
   },
   "dependencies": {
