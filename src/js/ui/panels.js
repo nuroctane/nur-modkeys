@@ -279,11 +279,12 @@ function buildCustomizePanel() {
   let html = `
 <div class="grp">
   <div class="glabel">MATCH A PHOTO</div>
-  <div class="hint">Upload a keyboard photo — we detect the board, seed the key field, pull a palette, then copy keys + board parts. Drag corners to fine-tune.</div>
+  <div class="hint">Upload any photo — keyboard, art, landscape, anything. We sample colours (and auto-detect a board if present), then apply them to keys and board parts. Drag corners to fine-tune. PNG or JPG · max 25 MB.</div>
   <label class="libBtn" style="display:inline-flex;align-items:center;justify-content:center;cursor:pointer;margin-top:6px">
     Upload photo…
-    <input type="file" id="photoMatchFile" accept="image/png,image/jpeg,image/webp" style="display:none">
+    <input type="file" id="photoMatchFile" accept="image/png,image/jpeg" style="display:none">
   </label>
+  <div class="hint" style="margin-top:4px">PNG or JPG &middot; max 25 MB</div>
   ${hasPhoto ? `
   <div id="photoMatchWrap" class="photoMatchWrap">
     <img id="photoMatchImg" class="photoMatchImg" src="${photoPreviewUrl()}" alt="Photo match" draggable="false">
@@ -799,6 +800,8 @@ export function setupPanelEvents() {
     if (ev.target.id === 'photoMatchFile') {
       const file = ev.target.files?.[0];
       if (!file) return;
+      const err = validateImageFile(file);
+      if (err) { toast(err); ev.target.value = ''; return; }
       try {
         await loadPhotoFile(file);
         const n = applyPhotoMatchPipeline({ recopy: true, onlySelected: false });
