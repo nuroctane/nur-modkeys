@@ -5,11 +5,11 @@ import { CASES, FINISHES, PLATES, SWITCHES, MATERIALS, EXTRAS, PROFILES, LIGHT_C
 import { setState, effectiveColorway, applyLight } from '../core/update.js';
 import {
   getOverride, setOverride, setOverrides, clearOverride, clearAllOverrides,
-  getSelectedIds, selectKey, clearSelection,
+  getSelectedIds, selectKey, clearSelection, KNOB_ID, isKnobId,
 } from '../core/perKey.js';
 import { loadImage, validateImageFile } from '../core/imageLoader.js';
 import { EMOJI, emojiUrl } from '../data/art.js';
-import { rebuildKey, getKeyLabel, updateKeyLegend, updateSelectionChrome } from '../core/keyboard.js';
+import { rebuildKey, rebuildKnob, getKeyLabel, updateKeyLegend, updateSelectionChrome } from '../core/keyboard.js';
 import { applyPlateFinish, matCase, matStem, sRGB } from '../core/scene.js';
 import { toast } from './toast.js';
 import {
@@ -35,16 +35,43 @@ function selectedOrPrimary() {
   return [];
 }
 
-/** Apply a key-editor field patch to all selected keys. */
+function rebuildId(id, { fullRebuild = false } = {}) {
+  if (isKnobId(id)) {
+    rebuildKnob();
+    return;
+  }
+  const parts = String(id).split('-').map(Number);
+  if (parts.length !== 2 || !parts.every(Number.isFinite)) return;
+  if (fullRebuild) rebuildKey(parts[0], parts[1]);
+  else updateKeyLegend(id);
+}
+
+function rebuildIds(ids, opts) {
+  let knobDone = false;
+  (ids || []).forEach((id) => {
+    if (isKnobId(id)) {
+      if (!knobDone) { rebuildKnob(); knobDone = true; }
+      return;
+    }
+    rebuildId(id, opts);
+  });
+}
+
+/** Apply a key-editor field patch to all selected keys (and/or rotary knob). */
 function applyKeyEditorPatch(patch, { fullRebuild = false } = {}) {
   const ids = selectedOrPrimary();
   if (!ids.length) return;
   setOverrides(ids, patch);
-  const needRebuild = fullRebuild || patch.bgColor !== undefined;
-  ids.forEach((id) => {
-    if (needRebuild) rebuildKey(...id.split('-').map(Number));
-    else updateKeyLegend(id);
-  });
+  const needRebuild = fullRebuild
+    || patch.bgColor !== undefined
+    || patch.fgColor !== undefined
+    || patch.markId !== undefined
+    || patch.imageData !== undefined
+    || patch.labelHidden !== undefined
+    || patch.imageFit !== undefined
+    || patch.glow !== undefined;
+  /* Knob always full rebuild (tick / body / art are not legendTex-on-cap) */
+  rebuildIds(ids, { fullRebuild: needRebuild });
 }
 
 export function lightDotStyle() {
@@ -302,8 +329,8 @@ function buildCustomizePanel() {
 <div class="grp" style="margin-top:12px">
   <div class="glabel">SELECTION</div>
   <div class="hint">${ids.length
-    ? `Editing <strong>${ids.length}</strong> key${ids.length > 1 ? 's' : ''}${primary ? ` (primary ${primary})` : ''}`
-    : 'Click a key on the board. <strong>Shift+click</strong> (desktop) or enable Multi (mobile) to select several.'}</div>
+    ? `Editing <strong>${ids.length}</strong> item${ids.length > 1 ? 's' : ''}${primary ? ` (primary ${isKnobId(primary) ? 'rotary knob' : primary})` : ''}`
+    : 'Click a key or the rotary knob. <strong>Shift+click</strong> (desktop) or enable Multi (mobile) to select several. Double-click the knob to customize.'}</div>
   <label class="keRow" style="margin-top:8px"><span>Multi-select mode</span>
     <label class="keToggle ${state.multiSelectMode ? 'on' : ''}" id="multiSelectToggle"><span></span></label>
   </label>
@@ -311,38 +338,47 @@ function buildCustomizePanel() {
 </div>`;
 
   if (!ids.length) {
-    html += `<div class="hint" style="margin-top:16px">Select a key to edit colours, legends, emoji, and images.</div>
+    html += `<div class="hint" style="margin-top:16px">Select a key or the rotary knob to edit colours, legends, emoji, and images.</div>
 <button type="button" class="libBtn" id="resetAllKeys" style="margin-top:12px">Reset all custom keys</button>`;
     return html;
   }
 
-  const bg = ov.bgColor || '#cccccc';
-  const fg = ov.fgColor || '#000000';
+  const knobPrim = isKnobId(primary);
+  const cwDef = effectiveColorway();
+  const bg = ov.bgColor || (knobPrim ? cwDef.x.bg : '#cccccc');
+  const fg = ov.fgColor || (knobPrim ? cwDef.x.fg : '#000000');
   html += `
 <div class="grp" style="margin-top:14px;border-top:1px solid var(--card2);padding-top:12px">
-  <div class="glabel">KEYCAP COLOUR</div>
+  ${knobPrim ? `<div class="hint" style="margin-bottom:8px">Rotary knob — <strong>drag</strong> to set underglow brightness. Customize body colour, dial tick, emoji, and top image like a key.</div>` : ''}
+  <div class="glabel">${knobPrim ? 'KNOB COLOUR' : 'KEYCAP COLOUR'}</div>
   <div class="keRow">
     <input type="color" id="cuBg" class="keColor" value="${escAttr(bg)}">
     <button type="button" class="keBtn" id="cuUseColorway">Use colorway</button>
   </div>
+  ${knobPrim ? '' : `
   <div class="glabel" style="margin-top:12px">LEGEND TEXT</div>
-  <input type="text" id="cuText" class="keInput" value="${escAttr(labelVal)}" style="width:100%;margin-top:4px">
+  <input type="text" id="cuText" class="keInput" value="${escAttr(labelVal)}" style="width:100%;margin-top:4px">`}
   <div class="keRow" style="margin-top:8px">
-    <label>Label shown</label>
+    <label>${knobPrim ? 'Dial tick shown' : 'Label shown'}</label>
     <label class="keToggle ${ov.labelHidden ? '' : 'on'}" id="cuLabelShown"><span></span></label>
   </div>
-  <div class="hint">Show or hide this key’s legend text</div>
-  <div class="glabel" style="margin-top:12px">LEGEND COLOUR</div>
+  <div class="hint">${knobPrim
+    ? 'Show or hide the dial position tick (hidden automatically when emoji/image is set)'
+    : 'Show or hide this key’s legend text'}</div>
+  <div class="glabel" style="margin-top:12px">${knobPrim ? 'TICK / LEGEND COLOUR' : 'LEGEND COLOUR'}</div>
   <div class="keRow">
     <input type="color" id="cuFg" class="keColor" value="${escAttr(fg)}">
     <button type="button" class="keBtn" id="cuFgAuto">Auto</button>
   </div>
+  ${knobPrim ? '' : `
   <div class="keRow" style="margin-top:8px"><label>Font size</label>
     <input type="range" id="cuFs" min="12" max="48" value="${ov.fontSize || 29}" class="keSlider"></div>
   <div class="keRow"><label>Glow text</label>
-    <label class="keToggle ${ov.glow ? 'on' : ''}" id="cuGlow"><span></span></label></div>
+    <label class="keToggle ${ov.glow ? 'on' : ''}" id="cuGlow"><span></span></label></div>`}
   <div class="glabel" style="margin-top:14px">EMOJI / IMAGE</div>
-  <div class="hint" style="margin-top:2px">Pick an emoji for this key. Click again or <strong>None</strong> to restore legend text.</div>
+  <div class="hint" style="margin-top:2px">${knobPrim
+    ? 'Emoji or image on the knob top replaces the dial tick. <strong>None</strong> restores the tick.'
+    : 'Pick an emoji for this key. Click again or <strong>None</strong> to restore legend text.'}</div>
   <div class="emojiGrid" id="emojiGrid">
     <button type="button" class="emojiBtn emojiBtnNone ${!ov.markId ? 'on' : ''}" data-emoji-clear="1" title="No emoji — show text">None</button>
     ${Object.keys(EMOJI).map((id) =>
@@ -586,18 +622,18 @@ export function setupPanelEvents() {
       state.perKeyOverrides = {};
       import('../core/keyboard.js').then((k) => {
         if (k.buildKeys) k.buildKeys();
+        if (k.rebuildKnob) k.rebuildKnob();
       });
       toast('All custom keys reset');
       renderPanel('customize');
       return;
     }
     if (ev.target.id === 'cuUseColorway') {
-      applyKeyEditorPatch({ bgColor: null });
       selectedOrPrimary().forEach((id) => {
         const o = getOverride(id);
-        if (o) { delete o.bgColor; setOverride(id, o); }
-        rebuildKey(...id.split('-').map(Number));
+        if (o) { delete o.bgColor; if (!Object.keys(o).length) clearOverride(id); else state.perKeyOverrides[id] = o; }
       });
+      rebuildIds(selectedOrPrimary(), { fullRebuild: true });
       renderPanel('customize');
       return;
     }
@@ -630,21 +666,23 @@ export function setupPanelEvents() {
       return;
     }
     if (ev.target.id === 'cuResetOne') {
-      selectedOrPrimary().forEach((id) => {
-        clearOverride(id);
-        rebuildKey(...id.split('-').map(Number));
-      });
-      toast('Key reset');
+      selectedOrPrimary().forEach((id) => clearOverride(id));
+      rebuildIds(selectedOrPrimary(), { fullRebuild: true });
+      toast('Reset');
       renderPanel('customize');
       return;
     }
     if (ev.target.id === 'cuRemoveArt') {
-      applyKeyEditorPatch({ imageData: null, markId: null });
       selectedOrPrimary().forEach((id) => {
         const o = getOverride(id);
-        if (o) { delete o.imageData; delete o.markId; setOverride(id, o); }
-        rebuildKey(...id.split('-').map(Number));
+        if (o) {
+          delete o.imageData;
+          delete o.markId;
+          if (!Object.keys(o).length) clearOverride(id);
+          else state.perKeyOverrides[id] = o;
+        }
       });
+      rebuildIds(selectedOrPrimary(), { fullRebuild: true });
       renderPanel('customize');
       return;
     }
@@ -655,13 +693,10 @@ export function setupPanelEvents() {
         delete o.markId;
         delete o.labelHidden;
         if (!Object.keys(o).length) clearOverride(id);
-        else {
-          /* replace store entry without re-adding nulls via setOverride */
-          state.perKeyOverrides[id] = o;
-        }
-        rebuildKey(...id.split('-').map(Number));
+        else state.perKeyOverrides[id] = o;
       });
-      toast('Emoji cleared — legend text restored');
+      rebuildIds(ids, { fullRebuild: true });
+      toast(ids.some(isKnobId) ? 'Emoji cleared — dial tick restored' : 'Emoji cleared — legend text restored');
       renderPanel('customize');
     };
     const emojiClear = ev.target.closest('[data-emoji-clear]');
@@ -681,7 +716,6 @@ export function setupPanelEvents() {
         return;
       }
       applyKeyEditorPatch({ markId: eid, labelHidden: true });
-      ids.forEach((id) => rebuildKey(...id.split('-').map(Number)));
       toast('Emoji applied');
       renderPanel('customize');
       return;
@@ -692,7 +726,6 @@ export function setupPanelEvents() {
         imageFit: fitBtn.dataset.fit,
         imageBehindText: fitBtn.dataset.fit === 'fill',
       });
-      selectedOrPrimary().forEach((id) => updateKeyLegend(id));
       renderPanel('customize');
       return;
     }

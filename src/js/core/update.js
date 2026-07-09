@@ -7,10 +7,10 @@ import { CASES, FINISHES, PLATES, SWITCHES, MATERIALS, PROFILES, GAP } from '../
 import {
   renderer, scene, camera, root, caseGroup, capsGroup, knobGroup, cableGroup, wristGroup,
   keyGlowGroup, glowPlane,
-  matAlpha, matMod, matAccent, matCase, matPlate, matStem,
+  matAlpha, matMod, matAccent, matCase, matPlate, matStem, matKnob,
   capMats, applyPlateFinish, applyCapMaterial, uni, sRGB,
 } from './scene.js';
-import { rebuildBoard, buildKeys, refreshLegends, preloadEmoji } from './keyboard.js';
+import { rebuildBoard, buildKeys, refreshLegends, preloadEmoji, rebuildKnob, syncKnobColorway } from './keyboard.js';
 import { setView } from './controls.js';
 import { pushState, undo as undoHistory, redo as redoHistory } from './history.js';
 import { clearPerKeyCapColors } from './perKey.js';
@@ -63,6 +63,8 @@ function applyColors(cw) {
   matAlpha.color.copy(sRGB(cw.a.bg));
   matMod.color.copy(sRGB(cw.m.bg));
   matAccent.color.copy(sRGB(cw.x.bg));
+  /* Knob follows accent when not per-key recoloured */
+  syncKnobColorway();
 }
 
 /** Truthy object customColors (photo match / custom hex roles). */
@@ -94,18 +96,28 @@ function applyColorwayFields(s, { instant = true } = {}) {
     strippedCaps = clearPerKeyCapColors();
   }
 
+  const afterColorwayVisual = () => {
+    if (strippedCaps) {
+      buildKeys();
+      rebuildKnob();
+    } else {
+      refreshLegends();
+      syncKnobColorway();
+    }
+  };
+
   if (hasCustomColors(s.customColors)) {
     if (instant) applyColors(s.customColors);
     else {
       tweenColor(matAlpha, s.customColors.a.bg);
       tweenColor(matMod, s.customColors.m.bg);
       tweenColor(matAccent, s.customColors.x.bg);
+      gsap.delayedCall(0.26, () => syncKnobColorway());
     }
     state.customColors = s.customColors;
     if (s.colorway && COLORWAYS[s.colorway]) state.colorway = s.colorway;
-    if (strippedCaps && instant) buildKeys();
-    else if (instant) refreshLegends();
-    else gsap.delayedCall(0.26, strippedCaps ? buildKeys : refreshLegends);
+    if (instant) afterColorwayVisual();
+    else gsap.delayedCall(0.26, strippedCaps ? () => { buildKeys(); rebuildKnob(); } : () => { refreshLegends(); syncKnobColorway(); });
     if (instant && panelRenderHook) panelRenderHook(state.section);
     return;
   }
@@ -117,15 +129,15 @@ function applyColorwayFields(s, { instant = true } = {}) {
       tweenColor(matAlpha, cw.a.bg);
       tweenColor(matMod, cw.m.bg);
       tweenColor(matAccent, cw.x.bg);
+      gsap.delayedCall(0.26, () => syncKnobColorway());
     }
     state.colorway = s.colorway;
     /* clear custom on stock colorway apply (chip passes customColors: null) */
     if (s.customColors === null || s.customColors === undefined) {
       state.customColors = null;
     }
-    if (strippedCaps && instant) buildKeys();
-    else if (instant) refreshLegends();
-    else gsap.delayedCall(0.26, strippedCaps ? buildKeys : refreshLegends);
+    if (instant) afterColorwayVisual();
+    else gsap.delayedCall(0.26, strippedCaps ? () => { buildKeys(); rebuildKnob(); } : () => { refreshLegends(); syncKnobColorway(); });
     if (instant && panelRenderHook) panelRenderHook(state.section);
     return;
   }
@@ -139,11 +151,11 @@ function applyColorwayFields(s, { instant = true } = {}) {
         tweenColor(matAlpha, cw.a.bg);
         tweenColor(matMod, cw.m.bg);
         tweenColor(matAccent, cw.x.bg);
+        gsap.delayedCall(0.26, () => syncKnobColorway());
       }
     }
-    if (strippedCaps && instant) buildKeys();
-    else if (instant) refreshLegends();
-    else gsap.delayedCall(0.26, strippedCaps ? buildKeys : refreshLegends);
+    if (instant) afterColorwayVisual();
+    else gsap.delayedCall(0.26, strippedCaps ? () => { buildKeys(); rebuildKnob(); } : () => { refreshLegends(); syncKnobColorway(); });
     return;
   }
 

@@ -13,10 +13,11 @@ import {
 } from './scene.js';
 import { BRAND_MARKS, MARKS, EMOJI, emojiUrl, emojiChar } from '../data/art.js';
 import {
-  getEffectiveText, getEffectiveFg,
+  getEffectiveText, getEffectiveFg, getEffectiveBg,
   getEffectiveImage, getEffectiveFontSize, hasGlow, hasImageBehindText,
   getOverride, keyId as perKeyId, getAllEntries, hasCustomText,
   isLabelHidden, getImageFit, getSelectedIds,
+  KNOB_ID, isKnobId,
 } from './perKey.js';
 import { composeLegend, renderText } from './imageLoader.js';
 
@@ -288,33 +289,7 @@ export function buildCase() {
   );
   skirt.position.y = 0.015;
   caseGroup.add(skirt);
-  if (L.knob) {
-    const body = new THREE.CylinderGeometry(0.42, 0.42, 0.32, 72, 1, false);
-    const bp = body.attributes.position;
-    for (let i = 0; i < bp.count; i++) {
-      const x = bp.getX(i), z = bp.getZ(i), r = Math.hypot(x, z);
-      if (r > 0.4) {
-        const a = Math.atan2(z, x), kk = 1 + 0.02 * Math.sign(Math.sin(a * 28));
-        bp.setX(i, x * kk);
-        bp.setZ(i, z * kk);
-      }
-    }
-    body.computeVertexNormals();
-    const bm = new THREE.Mesh(body, matKnob);
-    bm.position.y = 0.16;
-    bm.castShadow = true;
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.4, 0.07, 48), matKnob);
-    top.position.y = 0.35;
-    const dotm = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.035, 0.035, 0.02, 12),
-      new THREE.MeshBasicMaterial({ color: sRGB(0xdddde2) }),
-    );
-    dotm.position.set(0.24, 0.39, 0);
-    knobGroup.add(bm, top, dotm);
-    knobGroup.position.set(15.75 - L.total / 2, knobBaseY, -2);
-    knobGroup.traverse((n) => (n.userData.isKnob = true));
-  }
-  knobGroup.visible = !!L.knob && state.extras.knob;
+  rebuildKnob();
   {
     const curve = new THREE.CatmullRomCurve3([
       new THREE.Vector3(0, 0.04, -boardD / 2 - 0.3),
@@ -607,11 +582,12 @@ export function updateKeyLegend(id) {
 }
 
 export function getKeyLabel(id) {
+  if (isKnobId(id)) return 'Knob';
   const c = capsGroup.children.find(k => k.userData.perKeyId === id);
   return c ? c.userData.label : '';
 }
 
-/** Lift selected keys for multi-select feedback without full rebuild. */
+/** Lift selected keys / knob for multi-select feedback without full rebuild. */
 export function updateSelectionChrome() {
   const sel = new Set(getSelectedIds());
   capsGroup.children.forEach((c) => {
@@ -619,6 +595,153 @@ export function updateSelectionChrome() {
     const base = c.userData.baseY ?? CAP_Y;
     c.position.y = sel.has(c.userData.perKeyId) ? base + 0.04 : base;
   });
+  if (knobGroup.visible) {
+    const base = knobGroup.userData.baseY ?? knobBaseY;
+    knobGroup.position.y = sel.has(KNOB_ID) ? base + 0.04 : base;
+  }
+}
+
+/**
+ * Build / rebuild the rotary knob as a customizable “key” (id = KNOB_ID).
+ * Body follows colorway accent or per-key bgColor; tick = legend (fg + Label shown);
+ * emoji/image replace the tick on the top face.
+ */
+export function rebuildKnob() {
+  /* preserve rotation (brightness dial) across rebuilds */
+  const prevRotY = knobGroup.rotation.y;
+  knobGroup.traverse((n) => {
+    if (n.userData?.ownMat && n.material && n.material !== matKnob) {
+      try { n.material.dispose?.(); } catch { /* ignore */ }
+    }
+    if (n.userData?.isKnobLegend && n.material?.map) {
+      try { n.material.map.dispose?.(); n.material.dispose?.(); } catch { /* ignore */ }
+    }
+    if (n.userData?.isKnobTick && n.material) {
+      try { n.material.dispose?.(); } catch { /* ignore */ }
+    }
+  });
+  disposeGroup(knobGroup);
+  const L = LAYOUTS[state.layout];
+  if (!L?.knob) {
+    knobGroup.visible = false;
+    return;
+  }
+
+  const id = KNOB_ID;
+  const cw = effectiveColorway();
+  const role = 'x';
+  const defaultBg = cw[role].bg;
+  const defaultFg = cw[role].fg;
+  const ov = getOverride(id);
+  const bg = getEffectiveBg(id, defaultBg);
+  const fg = getEffectiveFg(id, defaultFg) || defaultFg;
+  const customBg = !!(ov && ov.bgColor);
+  const mat = customBg ? matKnob.clone() : matKnob;
+  if (customBg) {
+    mat.color.copy(sRGB(bg));
+    mat.needsUpdate = true;
+  } else {
+    matKnob.color.copy(sRGB(defaultBg));
+  }
+
+  const body = new THREE.CylinderGeometry(0.42, 0.42, 0.32, 72, 1, false);
+  const bp = body.attributes.position;
+  for (let i = 0; i < bp.count; i++) {
+    const x = bp.getX(i), z = bp.getZ(i), r = Math.hypot(x, z);
+    if (r > 0.4) {
+      const a = Math.atan2(z, x), kk = 1 + 0.02 * Math.sign(Math.sin(a * 28));
+      bp.setX(i, x * kk);
+      bp.setZ(i, z * kk);
+    }
+  }
+  body.computeVertexNormals();
+  const bm = new THREE.Mesh(body, mat);
+  bm.position.y = 0.16;
+  bm.castShadow = true;
+  if (customBg) bm.userData.ownMat = true;
+
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.4, 0.07, 48), mat);
+  top.position.y = 0.35;
+
+  const mark = resolveLegendMark(id, 'Knob');
+  const imageData = getEffectiveImage(id);
+  const labelHidden = isLabelHidden(id);
+  const hasArt = !!(imageData || mark);
+  /* Dial tick = legend: hidden when Label off, or replaced by emoji/image */
+  const tickOn = !labelHidden && !hasArt;
+
+  const tickMat = new THREE.MeshBasicMaterial({ color: sRGB(fg) });
+  const dotm = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.035, 0.035, 0.02, 12),
+    tickMat,
+  );
+  dotm.position.set(0.24, 0.39, 0);
+  dotm.visible = tickOn;
+  dotm.userData.isKnobTick = true;
+
+  knobGroup.add(bm, top, dotm);
+
+  if (hasArt) {
+    const imageFit = getImageFit(id);
+    const imgBehind = hasImageBehindText(id);
+    const effectiveFs = getEffectiveFontSize(id, 29);
+    const texOpts = {
+      customText: '',
+      customFg: fg,
+      imageData,
+      glow: false,
+      labelHidden: true,
+      imageFit,
+      imageBehindText: imgBehind,
+      fontSize: effectiveFs,
+      textOverride: false,
+    };
+    const leg = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.58, 0.58),
+      new THREE.MeshBasicMaterial({
+        map: legendTex('Knob', 1, fg, mark, texOpts),
+        transparent: true,
+        depthWrite: false,
+      }),
+    );
+    leg.material.toneMapped = false;
+    leg.rotation.x = -Math.PI / 2;
+    leg.position.y = 0.392;
+    leg.renderOrder = 2;
+    leg.userData.isKnobLegend = true;
+    knobGroup.add(leg);
+    knobGroup.userData.legend = leg;
+  } else {
+    knobGroup.userData.legend = null;
+  }
+
+  knobGroup.position.set(15.75 - L.total / 2, knobBaseY, -2);
+  knobGroup.rotation.y = prevRotY;
+  knobGroup.userData = Object.assign(knobGroup.userData || {}, {
+    isKnob: true,
+    perKeyId: id,
+    baseY: knobBaseY,
+    role,
+    ownMat: customBg,
+  });
+  knobGroup.traverse((n) => {
+    n.userData.isKnob = true;
+    n.userData.perKeyId = id;
+  });
+
+  const selected = getSelectedIds().includes(id);
+  knobGroup.position.y = selected ? knobBaseY + 0.04 : knobBaseY;
+  knobGroup.visible = !!state.extras.knob;
+}
+
+/** Apply shared matKnob accent tint when knob has no custom bg (colorway change). */
+export function syncKnobColorway() {
+  const ov = getOverride(KNOB_ID);
+  if (ov && ov.bgColor) return;
+  const cw = effectiveColorway();
+  matKnob.color.copy(sRGB(cw.x.bg));
+  /* tick / art may use new fg — light rebuild */
+  if (LAYOUTS[state.layout]?.knob && state.extras.knob) rebuildKnob();
 }
 
 export function rebuildBoard() {

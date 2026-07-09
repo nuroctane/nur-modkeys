@@ -1,5 +1,12 @@
 import { state } from './state.js';
 
+/** Stable perKeyOverrides id for the rotary knob (not a layout row-col). */
+export const KNOB_ID = 'knob';
+
+export function isKnobId(id) {
+  return id === KNOB_ID;
+}
+
 export function keyId(row, col) {
   return row + '-' + col;
 }

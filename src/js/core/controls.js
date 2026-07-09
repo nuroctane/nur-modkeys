@@ -148,8 +148,13 @@ getCanvas().addEventListener('pointerdown', (ev) => {
     dragEngaged = true;
     return;
   }
-  const hitKnob = pick(knobGroup.visible ? knobGroup.children : [], ev);
-  if (hitKnob) { dragMode = 'knob'; dragEngaged = true; return; }
+  const hitKnob = knobGroup.visible && pick(knobGroup.children, ev);
+  if (hitKnob) {
+    /* Brightness drag only after 5px move so click/double-click can customize */
+    dragMode = 'knob';
+    dragEngaged = false;
+    return;
+  }
   /* Orbit/pan always allowed — including while the key editor is open — so
      users can reframe the board mid-edit. Accidental click/tap jitter is
      filtered by the 5px engage threshold below (not by blocking camera). */
@@ -171,6 +176,14 @@ getCanvas().addEventListener('pointermove', (ev) => {
     return;
   }
   if (dragMode === 'knob') {
+    if (!dragEngaged) {
+      const travelled = Math.hypot(ev.clientX - downX, ev.clientY - downY);
+      if (travelled < 5) return;
+      dragEngaged = true;
+      lastX = ev.clientX;
+      lastY = ev.clientY;
+      return;
+    }
     knobGroup.rotation.y -= dx * 0.02;
     const b = THREE.MathUtils.clamp(uni.uBright.value + dx * 0.004, 0.1, 1.5);
     uni.uBright.value = b;
@@ -236,6 +249,16 @@ function settleCap(cap) {
 }
 
 let lastClickKey = null, lastClickTime = 0;
+const KNOB_EDIT = { perKeyId: 'knob', isKnob: true, isCap: false };
+
+function openKnobEdit(opts = {}) {
+  ctrl.vT = 0;
+  ctrl.vP = 0;
+  if (onKeyEdit) {
+    onKeyEdit(Object.assign({}, KNOB_EDIT, opts));
+  }
+}
+
 function endPointer(ev) {
   try {
     if (getCanvas().hasPointerCapture?.(ev.pointerId)) {
@@ -245,6 +268,32 @@ function endPointer(ev) {
   pointers.delete(ev.pointerId);
   getStage().classList.remove('grabbing');
   const moved = Math.hypot(ev.clientX - downX, ev.clientY - downY);
+  /* Knob tap / double-click (not a brightness drag) */
+  if (dragMode === 'knob' && !dragEngaged && moved < 5) {
+    const now = Date.now();
+    const multi = !!(ev.shiftKey || state.multiSelectMode);
+    if (state.section === 'customize' || multi) {
+      openKnobEdit({ _multi: multi, _shiftKey: ev.shiftKey });
+      lastClickKey = KNOB_EDIT;
+      lastClickTime = now;
+      dragMode = null;
+      dragEngaged = false;
+      return;
+    }
+    if (lastClickKey === KNOB_EDIT && now - lastClickTime < 350) {
+      openKnobEdit();
+      lastClickKey = null;
+      lastClickTime = 0;
+      dragMode = null;
+      dragEngaged = false;
+      return;
+    }
+    lastClickKey = KNOB_EDIT;
+    lastClickTime = now;
+    dragMode = null;
+    dragEngaged = false;
+    return;
+  }
   /* Only treat as key tap when we never engaged a real drag */
   if ((dragMode === 'orbit' || dragMode === 'pan') && !dragEngaged && moved < 5) {
     const hit = capOf(pick(capsGroup.children, ev));
