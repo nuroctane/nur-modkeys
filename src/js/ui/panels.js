@@ -2,13 +2,20 @@ import { state } from '../core/state.js';
 import { LAYOUTS } from '../data/layouts.js';
 import { COLORWAYS, PANEL_SWATCHES } from '../data/colorways.js';
 import { CASES, FINISHES, PLATES, SWITCHES, MATERIALS, EXTRAS, PROFILES, LIGHT_COLORS } from '../data/components.js';
-import { setState, effectiveColorway } from '../core/update.js';
+import { setState, effectiveColorway, applyLight } from '../core/update.js';
 import { setOverride, clearOverride, getOverride } from '../core/perKey.js';
 import { loadImage, validateImageFile } from '../core/imageLoader.js';
 import { MARKS } from '../data/art.js';
 import { rebuildKey, getKeyLabel, updateKeyLegend } from '../core/keyboard.js';
-import { applyPlateFinish } from '../core/scene.js';
+import { applyPlateFinish, matCase, matStem, sRGB } from '../core/scene.js';
 import { toast } from './toast.js';
+
+function effectiveCaseHex() {
+  return state.caseCustomColor || CASES[state.caseColor].c;
+}
+function effectiveSwitchHex() {
+  return state.switchColor || SWITCHES[state.sw].dot;
+}
 
 const $ = (id) => document.getElementById(id);
 
@@ -33,8 +40,8 @@ export function lightDotStyle() {
 export function syncUI(skipPanel) {
   const cw = effectiveColorway();
   $('dotKeycaps').style.background = cw.a.bg;
-  $('dotSwitches').style.background = SWITCHES[state.sw].dot;
-  $('dotCase').style.background = CASES[state.caseColor].c;
+  $('dotSwitches').style.background = effectiveSwitchHex();
+  $('dotCase').style.background = effectiveCaseHex();
   $('dotPlate').style.background = state.plateColor || PLATES[state.plate].c;
   $('dotLight').style.cssText = lightDotStyle();
   $('layoutVal').textContent = LAYOUTS[state.layout].pct;
@@ -127,13 +134,27 @@ const PANELS = {
     Object.entries(SWITCHES).map(([id, s]) => [id, s.name]),
     state.sw, 'sw',
   )}
-<div class="hint" style="margin-top:10px">${SWITCHES[state.sw].type} · ${SWITCHES[state.sw].force} · ${SWITCHES[state.sw].sound} sound · Double-click any key on the board to customize it.</div>`,
+<div class="hint" style="margin-top:10px">${SWITCHES[state.sw].type} · ${SWITCHES[state.sw].force} · ${SWITCHES[state.sw].sound} sound · Double-click any key on the board to customize it.</div>
+<div class="glabel" style="margin-top:16px">STEM COLOR</div>
+<div class="keRow" style="margin-top:6px">
+  <label>Stem</label>
+  <input type="color" id="switchColor" class="keColor" value="${effectiveSwitchHex()}">
+  <button type="button" class="keBtn" id="switchColorReset" title="Reset to switch default">Default</button>
+</div>
+<div class="hint" style="margin-top:6px">Default for ${SWITCHES[state.sw].name}: ${SWITCHES[state.sw].dot}</div>`,
 
   case: () => `
-<div class="glabel">COLOR</div>${swatchRow(
+<div class="glabel">PRESET</div>${swatchRow(
     Object.entries(CASES).map(([id, c]) => [id, c.c, c.c, c.name]),
     state.caseColor, 'caseColor',
   )}
+<div class="glabel" style="margin-top:16px">CUSTOM COLOR</div>
+<div class="keRow" style="margin-top:6px">
+  <label>Case</label>
+  <input type="color" id="caseCustomColor" class="keColor" value="${effectiveCaseHex()}">
+  <button type="button" class="keBtn" id="caseColorReset" title="Reset to preset">Default</button>
+</div>
+<div class="hint" style="margin-top:6px">Default for ${CASES[state.caseColor].name}: ${CASES[state.caseColor].c}</div>
 <div class="glabel" style="margin-top:16px">FINISH</div>${chipRow(
     Object.entries(FINISHES).map(([id, f]) => [id, f.name]),
     state.finish, 'finish',
@@ -165,6 +186,10 @@ const PANELS = {
     LIGHT_COLORS.map(c => [c, c, c]),
     state.light.mode === 'off' ? '' : state.light.color, 'lightColor',
   )}
+<div class="keRow" style="margin-top:10px">
+  <label>Custom</label>
+  <input type="color" id="lightCustomColor" class="keColor" value="${state.light.color}">
+</div>
 <div class="glabel" style="margin-top:16px">BRIGHTNESS</div>
 <input type="range" class="slider" id="brightSlider" min="0" max="1.5" step="0.02" value="${state.light.bright}">`,
 
@@ -281,8 +306,8 @@ export function setupPanelEvents() {
       if (act === 'profile') { setState({ profile: v }); return; }
       if (act === 'material') { setState({ material: v }); return; }
       if (act === 'colorway') { setState({ colorway: v, selectedPreset: null, customColors: null }); return; }
-      if (act === 'sw') { setState({ sw: v, selectedPreset: null }); return; }
-      if (act === 'caseColor') { setState({ caseColor: v }); return; }
+      if (act === 'sw') { setState({ sw: v, switchColor: null, selectedPreset: null }); return; }
+      if (act === 'caseColor') { setState({ caseColor: v, caseCustomColor: null }); return; }
       if (act === 'finish') { setState({ finish: v }); return; }
       if (act === 'plate') { setState({ plate: v, plateColor: null }); return; }
       if (act === 'lightMode') { setState({ light: { mode: v } }); return; }
@@ -296,6 +321,22 @@ export function setupPanelEvents() {
       if (el) el.value = PLATES[state.plate].c;
       const dot = $('dotPlate');
       if (dot) dot.style.background = PLATES[state.plate].c;
+      return;
+    }
+    if (ev.target.id === 'caseColorReset') {
+      setState({ caseCustomColor: null }, { skipPanel: true, animate: false });
+      const el = $('caseCustomColor');
+      if (el) el.value = CASES[state.caseColor].c;
+      const dot = $('dotCase');
+      if (dot) dot.style.background = CASES[state.caseColor].c;
+      return;
+    }
+    if (ev.target.id === 'switchColorReset') {
+      setState({ switchColor: null }, { skipPanel: true, animate: false });
+      const el = $('switchColor');
+      if (el) el.value = SWITCHES[state.sw].dot;
+      const dot = $('dotSwitches');
+      if (dot) dot.style.background = SWITCHES[state.sw].dot;
       return;
     }
     if (ev.target.id === 'applyCustomColors') {
@@ -320,20 +361,66 @@ export function setupPanelEvents() {
       return;
     }
   });
-  /* Live plate tint: do NOT setState on every input tick — that re-renders
-     the whole panel (kills the native color picker) and floods undo history.
-     Apply material directly; commit history once on change. */
+  /* Live color tints: do NOT setState on every input tick — re-rendering the
+     panel kills native color pickers and floods undo. Commit on change only. */
   panelBody.addEventListener('input', (ev) => {
-    if (ev.target.id !== 'plateColor') return;
+    const id = ev.target.id;
     const hex = ev.target.value;
-    state.plateColor = hex;
-    applyPlateFinish(state.plate, hex);
-    const dot = $('dotPlate');
-    if (dot) dot.style.background = hex;
+    if (id === 'plateColor') {
+      state.plateColor = hex;
+      applyPlateFinish(state.plate, hex);
+      const dot = $('dotPlate');
+      if (dot) dot.style.background = hex;
+      return;
+    }
+    if (id === 'caseCustomColor') {
+      state.caseCustomColor = hex;
+      matCase.color.copy(sRGB(hex));
+      const dot = $('dotCase');
+      if (dot) dot.style.background = hex;
+      return;
+    }
+    if (id === 'switchColor') {
+      state.switchColor = hex;
+      matStem.color.copy(sRGB(hex));
+      const dot = $('dotSwitches');
+      if (dot) dot.style.background = hex;
+      return;
+    }
+    if (id === 'lightCustomColor') {
+      state.light.color = hex;
+      applyLight();
+      const dot = $('dotLight');
+      if (dot) dot.style.cssText = lightDotStyle();
+      return;
+    }
+    if (id === 'brightSlider') {
+      const b = parseFloat(ev.target.value);
+      if (!Number.isFinite(b)) return;
+      state.light.bright = b;
+      applyLight();
+    }
   });
   panelBody.addEventListener('change', async (ev) => {
     if (ev.target.id === 'plateColor') {
       setState({ plateColor: ev.target.value }, { skipPanel: true, animate: false });
+      return;
+    }
+    if (ev.target.id === 'caseCustomColor') {
+      setState({ caseCustomColor: ev.target.value }, { skipPanel: true, animate: false });
+      return;
+    }
+    if (ev.target.id === 'switchColor') {
+      setState({ switchColor: ev.target.value }, { skipPanel: true, animate: false });
+      return;
+    }
+    if (ev.target.id === 'lightCustomColor') {
+      setState({ light: { color: ev.target.value } }, { skipPanel: true, animate: false });
+      return;
+    }
+    if (ev.target.id === 'brightSlider') {
+      const b = parseFloat(ev.target.value);
+      if (Number.isFinite(b)) setState({ light: { bright: b } }, { skipPanel: true, animate: false });
       return;
     }
     if (!_currentEditId) return;

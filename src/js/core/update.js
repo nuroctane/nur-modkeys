@@ -41,7 +41,7 @@ export function effectiveColorway() {
   return COLORWAYS[state.colorway];
 }
 
-function applyLight() {
+export function applyLight() {
   uni.uMode.value = modes[state.light.mode] || 3;
   uni.uColor.value.set(state.light.color);
   uni.uBright.value = state.light.bright;
@@ -74,8 +74,15 @@ function applyInstant(s) {
     refreshLegends();
   }
   if (s.caseColor) {
-    matCase.color.copy(sRGB(CASES[s.caseColor].c));
     state.caseColor = s.caseColor;
+    if (s.caseCustomColor === undefined) state.caseCustomColor = null;
+  }
+  if (s.caseCustomColor !== undefined) {
+    state.caseCustomColor = s.caseCustomColor;
+  }
+  if (s.caseColor || s.caseCustomColor !== undefined) {
+    const cHex = state.caseCustomColor || CASES[state.caseColor].c;
+    matCase.color.copy(sRGB(cHex));
   }
   if (s.finish) {
     const f = FINISHES[s.finish];
@@ -96,8 +103,15 @@ function applyInstant(s) {
     applyPlateFinish(state.plate, state.plateColor || PLATES[state.plate].c);
   }
   if (s.sw) {
-    matStem.color.copy(sRGB(SWITCHES[s.sw].dot));
     state.sw = s.sw;
+    if (s.switchColor === undefined) state.switchColor = null;
+  }
+  if (s.switchColor !== undefined) {
+    state.switchColor = s.switchColor;
+  }
+  if (s.sw || s.switchColor !== undefined) {
+    const sHex = state.switchColor || SWITCHES[state.sw].dot;
+    matStem.color.copy(sRGB(sHex));
   }
   if (s.material) {
     applyCapMaterial(s.material);
@@ -163,7 +177,15 @@ function apply3D(patch, animate) {
     tweenColor(matAccent, patch.customColors.x.bg);
     gsap.delayedCall(0.26, refreshLegends);
   }
-  if (patch.caseColor) tweenColor(matCase, CASES[patch.caseColor].c);
+  if (patch.caseColor) {
+    if (patch.caseCustomColor === undefined) state.caseCustomColor = null;
+    const cHex = state.caseCustomColor || CASES[patch.caseColor].c;
+    tweenColor(matCase, cHex);
+  }
+  if (patch.caseCustomColor !== undefined && !patch.caseColor) {
+    const cHex = patch.caseCustomColor || CASES[state.caseColor].c;
+    tweenColor(matCase, cHex);
+  }
   if (patch.finish) {
     const f = FINISHES[patch.finish];
     gsap.to(matCase, { metalness: f.metal, roughness: f.rough, clearcoat: f.cc, duration: 0.5 });
@@ -179,7 +201,15 @@ function apply3D(patch, animate) {
     tweenColor(matPlate, hex);
     applyPlateFinish(state.plate, hex);
   }
-  if (patch.sw) tweenColor(matStem, SWITCHES[patch.sw].dot, 0.4);
+  if (patch.sw) {
+    if (patch.switchColor === undefined) state.switchColor = null;
+    const sHex = state.switchColor || SWITCHES[patch.sw].dot;
+    tweenColor(matStem, sHex, 0.4);
+  }
+  if (patch.switchColor !== undefined && !patch.sw) {
+    const sHex = patch.switchColor || SWITCHES[state.sw].dot;
+    tweenColor(matStem, sHex, 0.4);
+  }
   if (patch.material) {
     applyCapMaterial(patch.material);
   }

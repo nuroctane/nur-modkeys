@@ -8,6 +8,8 @@ A browser-based mechanical keyboard configurator and 3D visualization tool. Buil
 
 **[Try it live](https://modkeys.vercel.app/)** · also embedded at [nuroctane.xyz/modkeys](https://nuroctane.xyz/modkeys)
 
+**Inspiration:** [thebuggeddev/modkeys](https://github.com/thebuggeddev/modkeys) — original project this configurator builds on.
+
 ---
 
 ## Features
@@ -19,9 +21,9 @@ A browser-based mechanical keyboard configurator and 3D visualization tool. Buil
 - **Colorways**: 19 curated presets (Claude, Gemini, Sakura, Verdant, Abyssal, Dune, Monochrome, Umbra, Moss, Contrast, Rosette, Noir, Embers, Matcha, Carbon, Vaporwave, Dracula, Blush, Honey) plus full custom colors
 - **Custom colors**: Alpha, mod, and accent keys with live hex preview
 - **Per-key customization**: Text, font size, foreground/background, glow, image upload, emoji marks
-- **Case & plate**: 16 case colors, 3 finishes (anodized / soft-touch / polished), 8 plate materials (aluminum, brass, polycarbonate, carbon fiber, copper, steel, POM, FR4)
-- **Switches**: 10 types (Boba U4T, Holy Panda, Box Jade, Silent Ink, Cream, Teal, Sunset, Topaz, Emerald, Silver) with distinctive 3D rendering and Web Audio click feedback
-- **Lighting**: Wave, Static, Breathe, or Off — color + brightness; underglow and per-key glow (GLSL)
+- **Case & plate**: 16 case presets + free color pickers; 3 finishes; 8 plate materials with texture maps + tint
+- **Switches**: 10 types with stem color picker (overrides default stem tint)
+- **Lighting**: Wave, Static, Breathe, or Off — swatches + free color picker + brightness; underglow and per-key glow (GLSL)
 - **Extras**: Rotary knob, coiled cable, walnut wrist rest, switch lubing service
 - **Undo/Redo**: History stack (up to 50 states) with keyboard shortcuts
 - **Export**: KLE JSON, SVG manufacturing template, full spec sheet JSON, and PDF

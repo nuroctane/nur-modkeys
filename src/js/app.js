@@ -298,13 +298,19 @@ export function mountModkeys() {
         matAccent.color.copy(sRGB(cw.x.bg));
       }
     }
-    if (snap.caseColor) matCase.color.copy(sRGB(CASES[snap.caseColor].c));
+    if (snap.caseColor || snap.caseCustomColor !== undefined) {
+      const cHex = snap.caseCustomColor || CASES[snap.caseColor || state.caseColor]?.c || CASES[state.caseColor].c;
+      matCase.color.copy(sRGB(cHex));
+    }
     if (snap.plate || snap.plateColor !== undefined) {
       const pid = snap.plate || state.plate;
       const phex = snap.plateColor !== undefined ? snap.plateColor : (state.plateColor || PLATES[pid].c);
       applyPlateFinish(pid, phex || PLATES[pid].c);
     }
-    if (snap.sw) matStem.color.copy(sRGB(SWITCHES[snap.sw].dot));
+    if (snap.sw || snap.switchColor !== undefined) {
+      const sHex = snap.switchColor || SWITCHES[snap.sw || state.sw]?.dot || SWITCHES[state.sw].dot;
+      matStem.color.copy(sRGB(sHex));
+    }
   }
   function renderSnapThumb(s) {
     if (s.colorway) {
@@ -320,13 +326,19 @@ export function mountModkeys() {
       matMod.color.copy(sRGB(cc.m.bg));
       if (cc.x && cc.x.bg) matAccent.color.copy(sRGB(cc.x.bg));
     }
-    if (s.caseColor) matCase.color.copy(sRGB(CASES[s.caseColor].c));
+    if (s.caseColor || s.caseCustomColor !== undefined) {
+      const cHex = s.caseCustomColor || CASES[s.caseColor || state.caseColor]?.c || CASES[state.caseColor].c;
+      matCase.color.copy(sRGB(cHex));
+    }
     if (s.plate || s.plateColor !== undefined) {
       const pid = s.plate || state.plate;
       const phex = s.plateColor != null ? s.plateColor : (state.plateColor || PLATES[pid].c);
       applyPlateFinish(pid, phex || PLATES[pid].c);
     }
-    if (s.sw) matStem.color.copy(sRGB(SWITCHES[s.sw].dot));
+    if (s.sw || s.switchColor !== undefined) {
+      const sHex = s.switchColor || SWITCHES[s.sw || state.sw]?.dot || SWITCHES[state.sw].dot;
+      matStem.color.copy(sRGB(sHex));
+    }
     if (s.light) {
       const modes = { wave: 0, static: 1, breathe: 2, off: 3 };
       Object.assign(state.light, s.light);

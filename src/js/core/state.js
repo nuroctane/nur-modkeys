@@ -6,10 +6,14 @@ const state = {
   colorway: 'claude',
   sw: 'boba',
   caseColor: 'porcelain',
+  /** Custom case tint (hex). null → use CASES[caseColor].c */
+  caseCustomColor: null,
   finish: 'anodized',
   plate: 'brass',
   /** Custom plate tint (hex). null → use PLATES[plate].c default for that material. */
   plateColor: null,
+  /** Custom switch stem tint (hex). null → use SWITCHES[sw].dot */
+  switchColor: null,
   light: { mode: 'static', color: '#cc785c', bright: 0.7 },
   extras: { knob: true, cable: false, wrist: false, lube: false },
   tool: 'orbit',
@@ -32,10 +36,12 @@ export function stateSlice() {
     brand: state.brand,
     colorway: state.colorway,
     caseColor: state.caseColor,
+    caseCustomColor: state.caseCustomColor,
     finish: state.finish,
     plate: state.plate,
     plateColor: state.plateColor,
     sw: state.sw,
+    switchColor: state.switchColor,
     material: state.material,
     light: state.light,
     extras: state.extras,

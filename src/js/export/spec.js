@@ -61,8 +61,10 @@ export function generateSpec() {
     },
 
     case: {
-      color: CASES[state.caseColor].name,
-      hex: CASES[state.caseColor].c,
+      preset: CASES[state.caseColor].name,
+      presetId: state.caseColor,
+      hex: state.caseCustomColor || CASES[state.caseColor].c,
+      colorIsCustom: !!state.caseCustomColor,
       finish: FINISHES[state.finish].name,
       suggestedMaterial: 'Aluminum CNC',
     },
@@ -81,6 +83,8 @@ export function generateSpec() {
       name: SWITCHES[state.sw].name,
       type: SWITCHES[state.sw].type,
       force: SWITCHES[state.sw].force,
+      stemColor: state.switchColor || SWITCHES[state.sw].dot,
+      stemColorIsCustom: !!state.switchColor,
       mount: 'Cherry MX',
       quantity: countKeys,
     },

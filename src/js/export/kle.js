@@ -1,6 +1,6 @@
 import { state } from '../core/state.js';
 import { LAYOUTS } from '../data/layouts.js';
-import { PROFILES, PLATES } from '../data/components.js';
+import { PROFILES, PLATES, CASES, SWITCHES } from '../data/components.js';
 import { effectiveColorway } from '../core/update.js';
 import { getEffectiveText, getEffectiveFg, getEffectiveBg, getEffectiveFontSize, getOverride, keyId } from '../core/perKey.js';
 
@@ -25,9 +25,9 @@ export function exportKLE() {
     name: `MODKEYS ${L.pct} — ${cwName}`,
     author: 'MODKEYS Configurator',
     notes: [
-      `Switch: ${state.sw}`,
+      `Switch: ${state.sw} ${state.switchColor || SWITCHES[state.sw]?.dot || ''}`.trim(),
       `Plate: ${state.plate} ${state.plateColor || PLATES[state.plate]?.c || ''}`.trim(),
-      `Case: ${state.caseColor}`,
+      `Case: ${state.caseColor} ${state.caseCustomColor || CASES[state.caseColor]?.c || ''}`.trim(),
       `Finish: ${state.finish}`,
       `Material: ${state.material}`,
       `Profile: ${profileName}`,
