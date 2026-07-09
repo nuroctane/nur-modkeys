@@ -24,6 +24,8 @@ export function generateSpec() {
       entry.imageData = ov.imageData;
     }
     if (ov.imageBehindText === true) entry.imageBehindText = true;
+    if (ov.imageFit) entry.imageFit = ov.imageFit;
+    if (ov.labelHidden === true) entry.labelHidden = true;
     if (ov.fontSize != null && ov.fontSize !== '') {
       const n = Number(ov.fontSize);
       if (Number.isFinite(n)) entry.fontSize = n;

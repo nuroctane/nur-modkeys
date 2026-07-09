@@ -23,6 +23,10 @@ const state = {
   section: 'keycaps',
   selectedPreset: 'claude',
   selectedKey: null,
+  /** Multi-select key ids for Customize panel */
+  selectedKeys: [],
+  /** Mobile multi-select toggle */
+  multiSelectMode: false,
   customColors: null,
   perKeyOverrides: {},
 };

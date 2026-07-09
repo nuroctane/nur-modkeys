@@ -214,13 +214,25 @@ export const MARKS = {
 
 export const EMOJI = {
   cat: "1f431",
+  dog: "1f436",
+  smile: "1f60a",
+  cool: "1f60e",
   blossom: "1f338",
   sparkles: "2728",
-  heart: "1f49c",
-  diamond: "1f4a0",
+  heart: "2764",
+  fire: "1f525",
+  rocket: "1f680",
+  star: "2b50",
+  diamond: "1f48e",
   wave: "1f30a",
-  hexagon: "2b23",
+  rainbow: "1f308",
+  banana: "1f34c",
+  gift: "1f381",
   crescent: "1f319",
+  paw: "1f43e",
+  bolt: "26a1",
+  brain: "1f9e0",
+  crown: "1f451",
 };
 
 export const emojiUrl = (cp) => "https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/72x72/" + cp + ".png";

@@ -959,3 +959,67 @@ button, .chip, .sw, .profBtn, .dShell .snav button, .tnav button, .pills button,
   margin: 4px 6px 0;
   letter-spacing: 0.02em;
 }
+
+/* Customize — emoji + photo match */
+.emojiGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.emojiBtn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--card2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.emojiBtn.on,
+.emojiBtn:hover {
+  border-color: var(--chipA, #6cf);
+  background: var(--card);
+}
+.photoMatchWrap {
+  position: relative;
+  margin-top: 10px;
+  max-width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--card2);
+}
+.photoMatchImg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 220px;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+}
+.photoMatchHandles {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+.photoHandle {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border-radius: 50%;
+  border: 2px solid #5de8f0;
+  background: rgba(4, 14, 22, 0.85);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.4);
+  cursor: grab;
+  pointer-events: auto;
+  padding: 0;
+  touch-action: none;
+}
+.photoHandle:active { cursor: grabbing; }

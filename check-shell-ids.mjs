@@ -18,6 +18,16 @@ const DYNAMIC = new Set([
   'keGlow','keImgBehind','keSidebarPreview',               // key editor internals (panel render)
   'communityGrid','galleryRetry',                          // gallery modal render
   'mkAdminOverlay',                                        // books-style admin dialog (runtime body inject)
+  /* panel-rendered controls (Customize / plate / case / light pickers) */
+  'plateColor','caseCustomColor','switchColor','lightCustomColor','brightSlider',
+  'photoMatchFile','photoMatchWrap','photoMatchImg','photoMatchHandles',
+  'photoCopyAll','photoCopySel','photoRecopy','photoClear',
+  'cuBg','cuFg','cuText','cuFs','cuGlow','cuLabelShown','cuImage','cuRemoveArt',
+  'cuUseColorway','cuFgAuto','cuResetOne','resetAllKeys','selClear','multiSelectToggle',
+  'emojiGrid','libOpen','applyCustomColors','clearCustomColors',
+  'hexAbg','hexAfg','hexMbg','hexMfg','hexXbg','hexXfg',
+  'keImageSidebar','keSidebarPreview','keRemoveImgSidebar',
+  'plateColorReset','caseColorReset','switchColorReset',
 ]);
 const DESKTOP_ONLY = new Set(['builds','scrollL','scrollR']); // featured strip; guarded in app.js
 const MOBILE_ONLY = new Set(['mExportToggle','mExportMenu']);  // export sheet; guarded in app.js

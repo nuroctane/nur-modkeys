@@ -225,9 +225,12 @@ export function mountModkeys() {
     }
   };
 
-  /* key editor */
+  /* key editor / Customize selection */
   onKeyEditClick((keyData) => {
-    showKeyEditor(keyData);
+    showKeyEditor(keyData, {
+      multi: !!(keyData._multi || keyData._shiftKey),
+      shiftKey: !!keyData._shiftKey,
+    });
   });
 
   /* keyboard shortcuts */

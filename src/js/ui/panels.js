@@ -3,12 +3,19 @@ import { LAYOUTS } from '../data/layouts.js';
 import { COLORWAYS, PANEL_SWATCHES } from '../data/colorways.js';
 import { CASES, FINISHES, PLATES, SWITCHES, MATERIALS, EXTRAS, PROFILES, LIGHT_COLORS } from '../data/components.js';
 import { setState, effectiveColorway, applyLight } from '../core/update.js';
-import { setOverride, clearOverride, getOverride } from '../core/perKey.js';
+import {
+  getOverride, setOverride, setOverrides, clearOverride, clearAllOverrides,
+  getSelectedIds, selectKey, clearSelection,
+} from '../core/perKey.js';
 import { loadImage, validateImageFile } from '../core/imageLoader.js';
-import { MARKS } from '../data/art.js';
-import { rebuildKey, getKeyLabel, updateKeyLegend } from '../core/keyboard.js';
+import { EMOJI, emojiUrl } from '../data/art.js';
+import { rebuildKey, getKeyLabel, updateKeyLegend, updateSelectionChrome } from '../core/keyboard.js';
 import { applyPlateFinish, matCase, matStem, sRGB } from '../core/scene.js';
 import { toast } from './toast.js';
+import {
+  loadPhotoFile, hasPhotoSession, photoPreviewUrl,
+  copyColorsFromPhoto, setCornerFromPreview, cornersInPreview, clearPhotoSession,
+} from '../core/photoMatch.js';
 
 function effectiveCaseHex() {
   return state.caseCustomColor || CASES[state.caseColor].c;
@@ -19,15 +26,23 @@ function effectiveSwitchHex() {
 
 const $ = (id) => document.getElementById(id);
 
-/** Apply a key-editor field patch and refresh the 3D legend immediately. */
+function selectedOrPrimary() {
+  const ids = getSelectedIds();
+  if (ids.length) return ids;
+  if (_currentEditId) return [_currentEditId];
+  return [];
+}
+
+/** Apply a key-editor field patch to all selected keys. */
 function applyKeyEditorPatch(patch, { fullRebuild = false } = {}) {
-  if (!_currentEditId) return;
-  setOverride(_currentEditId, patch);
-  if (fullRebuild) {
-    rebuildKey(..._currentEditId.split('-').map(Number));
-  } else {
-    updateKeyLegend(_currentEditId);
-  }
+  const ids = selectedOrPrimary();
+  if (!ids.length) return;
+  setOverrides(ids, patch);
+  const needRebuild = fullRebuild || patch.bgColor !== undefined;
+  ids.forEach((id) => {
+    if (needRebuild) rebuildKey(...id.split('-').map(Number));
+    else updateKeyLegend(id);
+  });
 }
 
 export function lightDotStyle() {
@@ -203,7 +218,110 @@ const PANELS = {
     }
     return html;
   },
+
+  customize: () => buildCustomizePanel(),
 };
+
+function escAttr(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+function buildCustomizePanel() {
+  const ids = getSelectedIds();
+  const primary = ids[ids.length - 1] || null;
+  const ov = primary ? (getOverride(primary) || {}) : {};
+  const defaultLabel = primary ? (getKeyLabel(primary) || '') : '';
+  const labelVal = ov.customText !== undefined ? ov.customText : defaultLabel;
+  const fit = ov.imageFit || (ov.imageBehindText ? 'fill' : 'wrap');
+  const hasPhoto = hasPhotoSession();
+
+  let html = `
+<div class="grp">
+  <div class="glabel">MATCH A PHOTO</div>
+  <div class="hint">Copy key colours from a keyboard photo or art image. Drag the four corners to fit, then copy.</div>
+  <label class="libBtn" style="display:inline-flex;align-items:center;justify-content:center;cursor:pointer;margin-top:6px">
+    Upload photo…
+    <input type="file" id="photoMatchFile" accept="image/png,image/jpeg,image/webp" style="display:none">
+  </label>
+  ${hasPhoto ? `
+  <div id="photoMatchWrap" class="photoMatchWrap">
+    <img id="photoMatchImg" class="photoMatchImg" src="${photoPreviewUrl()}" alt="Photo match" draggable="false">
+    <div id="photoMatchHandles" class="photoMatchHandles"></div>
+  </div>
+  <button type="button" class="libBtn" id="photoCopyAll" style="margin-top:8px">Copy every key</button>
+  <button type="button" class="libBtn" id="photoCopySel" style="margin-top:4px">Copy selected only</button>
+  <button type="button" class="libBtn" id="photoRecopy" style="margin-top:4px">Re-copy from photo</button>
+  <button type="button" class="keBtn" id="photoClear" style="margin-top:4px">Clear photo</button>
+  ` : ''}
+</div>
+<div class="grp" style="margin-top:12px">
+  <div class="glabel">SELECTION</div>
+  <div class="hint">${ids.length
+    ? `Editing <strong>${ids.length}</strong> key${ids.length > 1 ? 's' : ''}${primary ? ` (primary ${primary})` : ''}`
+    : 'Click a key on the board. <strong>Shift+click</strong> (desktop) or enable Multi (mobile) to select several.'}</div>
+  <label class="keRow" style="margin-top:8px"><span>Multi-select mode</span>
+    <label class="keToggle ${state.multiSelectMode ? 'on' : ''}" id="multiSelectToggle"><span></span></label>
+  </label>
+  <button type="button" class="keBtn" id="selClear" style="margin-top:6px">Clear selection</button>
+</div>`;
+
+  if (!ids.length) {
+    html += `<div class="hint" style="margin-top:16px">Select a key to edit colours, legends, emoji, and images.</div>
+<button type="button" class="libBtn" id="resetAllKeys" style="margin-top:12px">Reset all custom keys</button>`;
+    return html;
+  }
+
+  const bg = ov.bgColor || '#cccccc';
+  const fg = ov.fgColor || '#000000';
+  html += `
+<div class="grp" style="margin-top:14px;border-top:1px solid var(--card2);padding-top:12px">
+  <div class="glabel">KEYCAP COLOUR</div>
+  <div class="keRow">
+    <input type="color" id="cuBg" class="keColor" value="${escAttr(bg)}">
+    <button type="button" class="keBtn" id="cuUseColorway">Use colorway</button>
+  </div>
+  <div class="glabel" style="margin-top:12px">LEGEND TEXT</div>
+  <input type="text" id="cuText" class="keInput" value="${escAttr(labelVal)}" style="width:100%;margin-top:4px">
+  <div class="keRow" style="margin-top:8px">
+    <label>Label shown</label>
+    <label class="keToggle ${ov.labelHidden ? '' : 'on'}" id="cuLabelShown"><span></span></label>
+  </div>
+  <div class="hint">Show or hide this key’s legend text</div>
+  <div class="glabel" style="margin-top:12px">LEGEND COLOUR</div>
+  <div class="keRow">
+    <input type="color" id="cuFg" class="keColor" value="${escAttr(fg)}">
+    <button type="button" class="keBtn" id="cuFgAuto">Auto</button>
+  </div>
+  <div class="keRow" style="margin-top:8px"><label>Font size</label>
+    <input type="range" id="cuFs" min="12" max="48" value="${ov.fontSize || 29}" class="keSlider"></div>
+  <div class="keRow"><label>Glow text</label>
+    <label class="keToggle ${ov.glow ? 'on' : ''}" id="cuGlow"><span></span></label></div>
+  <div class="glabel" style="margin-top:14px">EMOJI / IMAGE</div>
+  <div class="emojiGrid" id="emojiGrid">
+    ${Object.keys(EMOJI).map((id) =>
+      `<button type="button" class="emojiBtn ${ov.markId === id ? 'on' : ''}" data-emoji="${id}" title="${id}">
+        <img src="${emojiUrl(EMOJI[id])}" alt="${id}" width="22" height="22"></button>`).join('')}
+  </div>
+  <div class="keRow" style="margin-top:8px">
+    <label class="libBtn" style="cursor:pointer;flex:1;text-align:center">Upload image…
+      <input type="file" id="cuImage" accept="image/png,image/jpeg,image/webp" style="display:none">
+    </label>
+    <button type="button" class="keBtn" id="cuRemoveArt">Remove art</button>
+  </div>
+  ${ov.imageData ? `<img src="${ov.imageData}" class="kePreview" style="margin-top:8px;max-width:100%">` : ''}
+  <div class="glabel" style="margin-top:12px">IMAGE FIT</div>
+  <div class="rowFlex" style="margin-top:4px">
+    ${['wrap', 'fill', 'sticker'].map((f) =>
+      `<button type="button" class="chip ${fit === f ? 'on' : ''}" data-fit="${f}">${
+        f === 'wrap' ? 'Wrap key' : f === 'fill' ? 'Fill top' : 'Sticker'
+      }</button>`).join('')}
+  </div>
+  <div class="hint" style="margin-top:4px">Wrap = full face · Fill = under text · Sticker = small centre</div>
+  <button type="button" class="keBtn" id="cuResetOne" style="margin-top:14px">Reset this key${ids.length > 1 ? 's' : ''}</button>
+  <button type="button" class="libBtn" id="resetAllKeys" style="margin-top:6px">Reset all custom keys</button>
+</div>`;
+  return html;
+}
 
 export function renderPanel(section) {
   state.section = section;
@@ -218,9 +336,10 @@ export function renderPanel(section) {
       setState({ light: { bright: parseFloat(sl.value) } });
     };
   }
+  if (section === 'customize') mountPhotoHandles();
 }
 
-/* key editor popover */
+/* key editor � opens Customize section (rich panel + multi-select) */
 let _currentEditId = null;
 
 function updateSidebarKeyImage() {
@@ -236,64 +355,83 @@ function updateSidebarKeyImage() {
   }
 }
 
-export function showKeyEditor(keyData) {
-  _currentEditId = keyData.perKeyId;
-  const ov = getOverride(_currentEditId) || {};
-  const defaultLabel = keyData.label || getKeyLabel(keyData.perKeyId) || '';
-  const html = `
-<div class="keHead">
-  <span>Key ${_currentEditId}</span>
-  <button id="keClose" class="keBtn">✕</button>
-</div>
-<div class="keBody">
-  <div class="keRow"><label>Text</label><input type="text" id="keText" value="${(ov.customText !== undefined ? ov.customText : defaultLabel).replace(/"/g, '&quot;')}" class="keInput"></div>
-  <div class="keRow"><label>Font size</label><input type="range" id="keFs" min="12" max="48" value="${ov.fontSize || 29}" class="keSlider"></div>
-  <div class="keRow"><label>FG color</label><input type="color" id="keFg" value="${ov.fgColor || '#000000'}" class="keColor"></div>
-  <div class="keRow"><label>BG color</label><input type="color" id="keBg" value="${ov.bgColor || '#ffffff'}" class="keColor"></div>
-  <div class="keRow"><label>Glow text</label><label class="keToggle ${ov.glow ? 'on' : ''}" id="keGlow"><span></span></label></div>
-  <div class="keRow"><label>Image behind text</label><label class="keToggle ${ov.imageBehindText ? 'on' : ''}" id="keImgBehind"><span></span></label></div>
-  <div class="keRow"><label>Image</label><input type="file" id="keImage" accept="image/png,image/jpeg" class="keFile"></div>
-  <div class="keHint">PNG or JPG &middot; max 25 MB</div>
-  ${ov.imageData ? `<div class="keRow"><label></label><img src="${ov.imageData}" class="kePreview"><button id="keRemoveImg" class="keBtn">Remove</button></div>` : ''}
-  <div class="keRow" style="margin-top:12px"><button id="keReset" class="keBtn">Reset to default</button></div>
-</div>`;
-
+export function showKeyEditor(keyData, opts = {}) {
+  const id = keyData.perKeyId || keyData;
+  const multi = !!(opts.multi || state.multiSelectMode || opts.shiftKey);
+  selectKey(id, { multi });
+  _currentEditId = state.selectedKey;
+  updateSelectionChrome();
   const pop = $('keyEditor');
-  if (!pop) return;
-  pop.innerHTML = html;
-  pop.classList.add('open');
-  $('panelBody').classList.add('keOpen');
-  updateSidebarKeyImage();
-
-  /* Direct bindings so font-size / text / color always fire after each
-     showKeyEditor() re-render (innerHTML replaces nodes). stopPropagation
-     avoids the delegated #keyEditor listener applying the patch twice. */
-  const bind = (elId, handler) => {
-    const el = $(elId);
-    if (!el) return;
-    el.addEventListener('input', (ev) => {
-      ev.stopPropagation();
-      handler(ev);
-    });
-  };
-  bind('keText', (ev) => applyKeyEditorPatch({ customText: ev.target.value || '' }));
-  bind('keFs', (ev) => {
-    const n = parseInt(ev.target.value, 10);
-    applyKeyEditorPatch({ fontSize: Number.isFinite(n) ? n : 29 });
-  });
-  bind('keFg', (ev) => applyKeyEditorPatch({ fgColor: ev.target.value }));
-  bind('keBg', (ev) => applyKeyEditorPatch({ bgColor: ev.target.value }, { fullRebuild: true }));
+  if (pop) pop.classList.remove('open');
+  $('panelBody')?.classList.remove('keOpen');
+  renderPanel('customize');
 }
 
 export function hideKeyEditor() {
   const pop = $('keyEditor');
   if (pop) pop.classList.remove('open');
-  $('panelBody').classList.remove('keOpen');
+  $('panelBody')?.classList.remove('keOpen');
   _currentEditId = null;
-  state.selectedKey = null;
+  clearSelection();
+  updateSelectionChrome();
   updateSidebarKeyImage();
 }
 
+export function refreshCustomizeIfOpen() {
+  if (state.section === 'customize') renderPanel('customize');
+  updateSelectionChrome();
+}
+
+function mountPhotoHandles() {
+  const wrap = $('photoMatchWrap');
+  const img = $('photoMatchImg');
+  const layer = $('photoMatchHandles');
+  if (!wrap || !img || !layer || !hasPhotoSession()) return;
+
+  const place = () => {
+    const w = img.clientWidth || 1;
+    const h = img.clientHeight || 1;
+    const corners = cornersInPreview(w, h);
+    layer.style.width = w + 'px';
+    layer.style.height = h + 'px';
+    layer.innerHTML = corners.map((c, i) =>
+      `<button type="button" class="photoHandle" data-corner="${i}" style="left:${c.x}px;top:${c.y}px" aria-label="Corner ${i + 1}"></button>`,
+    ).join('');
+  };
+  if (img.complete) place();
+  else img.onload = place;
+
+  layer.onpointerdown = (ev) => {
+    const btn = ev.target.closest('.photoHandle');
+    if (!btn) return;
+    ev.preventDefault();
+    const idx = parseInt(btn.dataset.corner, 10);
+    const w = img.clientWidth;
+    const h = img.clientHeight;
+    const move = (e) => {
+      const r = img.getBoundingClientRect();
+      const px = Math.max(0, Math.min(w, e.clientX - r.left));
+      const py = Math.max(0, Math.min(h, e.clientY - r.top));
+      setCornerFromPreview(idx, px, py, w, h);
+      btn.style.left = px + 'px';
+      btn.style.top = py + 'px';
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+}
+
+function afterPhotoCopy() {
+  Object.keys(state.perKeyOverrides || {}).forEach((id) => {
+    if (state.perKeyOverrides[id]?.bgColor) rebuildKey(...id.split('-').map(Number));
+  });
+  toast('Colours copied from photo');
+  renderPanel('customize');
+}
 export function setupPanelEvents() {
   const panelBody = $('panelBody');
   if (!panelBody) return;
@@ -360,12 +498,148 @@ export function setupPanelEvents() {
       updateSidebarKeyImage();
       return;
     }
+    /* ── Customize panel ───────────────────────────────────── */
+    if (ev.target.id === 'multiSelectToggle' || ev.target.closest('#multiSelectToggle')) {
+      state.multiSelectMode = !state.multiSelectMode;
+      renderPanel('customize');
+      toast(state.multiSelectMode ? 'Multi-select on — tap keys to add' : 'Multi-select off');
+      return;
+    }
+    if (ev.target.id === 'selClear') {
+      clearSelection();
+      _currentEditId = null;
+      updateSelectionChrome();
+      renderPanel('customize');
+      return;
+    }
+    if (ev.target.id === 'resetAllKeys') {
+      clearAllOverrides();
+      clearSelection();
+      state.perKeyOverrides = {};
+      import('../core/keyboard.js').then((k) => {
+        if (k.buildKeys) k.buildKeys();
+      });
+      toast('All custom keys reset');
+      renderPanel('customize');
+      return;
+    }
+    if (ev.target.id === 'cuUseColorway') {
+      applyKeyEditorPatch({ bgColor: null });
+      selectedOrPrimary().forEach((id) => {
+        const o = getOverride(id);
+        if (o) { delete o.bgColor; setOverride(id, o); }
+        rebuildKey(...id.split('-').map(Number));
+      });
+      renderPanel('customize');
+      return;
+    }
+    if (ev.target.id === 'cuLabelShown' || ev.target.closest('#cuLabelShown')) {
+      const ids = selectedOrPrimary();
+      const cur = ids[0] ? getOverride(ids[0]) : null;
+      applyKeyEditorPatch({ labelHidden: !(cur && cur.labelHidden) });
+      renderPanel('customize');
+      return;
+    }
+    if (ev.target.id === 'cuGlow' || ev.target.closest('#cuGlow')) {
+      const ids = selectedOrPrimary();
+      const cur = ids[0] ? getOverride(ids[0]) : null;
+      applyKeyEditorPatch({ glow: !(cur && cur.glow) });
+      renderPanel('customize');
+      return;
+    }
+    if (ev.target.id === 'cuFgAuto') {
+      const ids = selectedOrPrimary();
+      ids.forEach((id) => {
+        const o = getOverride(id) || {};
+        const bg = o.bgColor || '#888888';
+        const n = parseInt(bg.slice(1), 16);
+        const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+        const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+        setOverride(id, { fgColor: lum > 0.55 ? '#1a1a1a' : '#f4f4f4' });
+        updateKeyLegend(id);
+      });
+      renderPanel('customize');
+      return;
+    }
+    if (ev.target.id === 'cuResetOne') {
+      selectedOrPrimary().forEach((id) => {
+        clearOverride(id);
+        rebuildKey(...id.split('-').map(Number));
+      });
+      toast('Key reset');
+      renderPanel('customize');
+      return;
+    }
+    if (ev.target.id === 'cuRemoveArt') {
+      applyKeyEditorPatch({ imageData: null, markId: null });
+      selectedOrPrimary().forEach((id) => {
+        const o = getOverride(id);
+        if (o) { delete o.imageData; delete o.markId; setOverride(id, o); }
+        rebuildKey(...id.split('-').map(Number));
+      });
+      renderPanel('customize');
+      return;
+    }
+    const emojiBtn = ev.target.closest('[data-emoji]');
+    if (emojiBtn) {
+      applyKeyEditorPatch({ markId: emojiBtn.dataset.emoji, labelHidden: true });
+      selectedOrPrimary().forEach((id) => rebuildKey(...id.split('-').map(Number)));
+      renderPanel('customize');
+      return;
+    }
+    const fitBtn = ev.target.closest('[data-fit]');
+    if (fitBtn) {
+      applyKeyEditorPatch({
+        imageFit: fitBtn.dataset.fit,
+        imageBehindText: fitBtn.dataset.fit === 'fill',
+      });
+      selectedOrPrimary().forEach((id) => updateKeyLegend(id));
+      renderPanel('customize');
+      return;
+    }
+    if (ev.target.id === 'photoCopyAll') {
+      const n = copyColorsFromPhoto({ autoLegend: true, onlySelected: false });
+      if (n) afterPhotoCopy();
+      else toast('Load a photo first');
+      return;
+    }
+    if (ev.target.id === 'photoCopySel' || ev.target.id === 'photoRecopy') {
+      const n = copyColorsFromPhoto({
+        autoLegend: true,
+        onlySelected: ev.target.id === 'photoCopySel',
+      });
+      if (n) afterPhotoCopy();
+      else toast(ev.target.id === 'photoCopySel' ? 'Select keys first' : 'Load a photo first');
+      return;
+    }
+    if (ev.target.id === 'photoClear') {
+      clearPhotoSession();
+      renderPanel('customize');
+      return;
+    }
   });
   /* Live color tints: do NOT setState on every input tick — re-rendering the
      panel kills native color pickers and floods undo. Commit on change only. */
   panelBody.addEventListener('input', (ev) => {
     const id = ev.target.id;
     const hex = ev.target.value;
+    if (id === 'cuBg') {
+      applyKeyEditorPatch({ bgColor: hex }, { fullRebuild: true });
+      return;
+    }
+    if (id === 'cuFg') {
+      applyKeyEditorPatch({ fgColor: hex });
+      return;
+    }
+    if (id === 'cuText') {
+      applyKeyEditorPatch({ customText: hex || '' });
+      return;
+    }
+    if (id === 'cuFs') {
+      const n = parseInt(hex, 10);
+      applyKeyEditorPatch({ fontSize: Number.isFinite(n) ? n : 29 });
+      return;
+    }
     if (id === 'plateColor') {
       state.plateColor = hex;
       applyPlateFinish(state.plate, hex);
@@ -402,6 +676,33 @@ export function setupPanelEvents() {
     }
   });
   panelBody.addEventListener('change', async (ev) => {
+    if (ev.target.id === 'photoMatchFile') {
+      const file = ev.target.files?.[0];
+      if (!file) return;
+      try {
+        await loadPhotoFile(file);
+        toast('Photo loaded — drag corners, then Copy every key');
+        renderPanel('customize');
+      } catch {
+        toast('Could not load photo');
+      }
+      return;
+    }
+    if (ev.target.id === 'cuImage') {
+      const file = ev.target.files?.[0];
+      if (!file) return;
+      const err = validateImageFile(file);
+      if (err) { toast(err); return; }
+      const dataUrl = await loadImage(file);
+      applyKeyEditorPatch({ imageData: dataUrl, imageFit: 'wrap' });
+      selectedOrPrimary().forEach((id) => rebuildKey(...id.split('-').map(Number)));
+      renderPanel('customize');
+      return;
+    }
+    if (ev.target.id === 'cuBg') {
+      setState({ perKeyOverrides: state.perKeyOverrides }, { skipPanel: true, animate: false });
+      return;
+    }
     if (ev.target.id === 'plateColor') {
       setState({ plateColor: ev.target.value }, { skipPanel: true, animate: false });
       return;

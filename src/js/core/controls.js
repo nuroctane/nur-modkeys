@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import gsap from 'gsap';
 import { renderer, scene, camera, root, caseGroup, capsGroup, knobGroup, uni } from './scene.js';
-import { plateMesh } from './keyboard.js';
+import { plateMesh, updateSelectionChrome } from './keyboard.js';
 import { state } from './state.js';
 import { SWITCHES } from '../data/components.js';
 import { playKeyClick } from '../ui/sound.js';
+import { selectKey } from './perKey.js';
 
 let onKeyEdit = null;
 export function onKeyEditClick(fn) { onKeyEdit = fn; }
@@ -249,26 +250,29 @@ function endPointer(ev) {
     const hit = capOf(pick(capsGroup.children, ev));
     if (hit && !state.exploded) {
       const now = Date.now();
+      const multi = !!(ev.shiftKey || state.multiSelectMode);
+      /* Single-click while Customize open or multi mode: select without waiting for double-click */
+      if (state.section === 'customize' || multi) {
+        settleCap(hit);
+        ctrl.vT = 0;
+        ctrl.vP = 0;
+        if (onKeyEdit) onKeyEdit(Object.assign({}, hit.userData, { _multi: multi, _shiftKey: ev.shiftKey }));
+        lastClickKey = hit;
+        lastClickTime = now;
+        dragMode = null;
+        dragEngaged = false;
+        return;
+      }
       if (hit === lastClickKey && now - lastClickTime < 350) {
-        /* Double-click → key editor: kill residual press + camera inertia
-           from the first click; intentional orbit still works after open. */
+        /* Double-click → Customize: kill residual press + camera inertia */
         settleCap(hit);
         if (hoverCap && hoverCap !== hit) settleCap(hoverCap);
         hoverCap = null;
         ctrl.vT = 0;
         ctrl.vP = 0;
-        state.selectedKey = hit.userData.perKeyId;
         if (onKeyEdit) onKeyEdit(hit.userData);
         lastClickKey = null;
         lastClickTime = 0;
-        dragMode = null;
-        dragEngaged = false;
-        return;
-      }
-      /* While editor open: allow double-tap to switch keys, no press anim */
-      if (state.selectedKey) {
-        lastClickKey = hit;
-        lastClickTime = now;
         dragMode = null;
         dragEngaged = false;
         return;

@@ -16,6 +16,7 @@ import {
   getEffectiveText, getEffectiveFg, getEffectiveMark,
   getEffectiveImage, getEffectiveFontSize, hasGlow, hasImageBehindText,
   getOverride, keyId as perKeyId, getAllEntries, hasCustomText,
+  isLabelHidden, getImageFit, getSelectedIds,
 } from './perKey.js';
 import { composeLegend, renderText } from './imageLoader.js';
 
@@ -108,20 +109,43 @@ function legendCacheSet(k, v) {
   legendCache.set(k, v);
 }
 const S = 2;
+function drawImageFit(g, img, W, H, pad, fit) {
+  const iw = img.naturalWidth || img.width || W;
+  const ih = img.naturalHeight || img.height || H;
+  if (fit === 'sticker') {
+    const scale = Math.min((W - pad * 2) / iw, (H - pad * 2) / ih) * 0.55;
+    const dw = iw * scale, dh = ih * scale;
+    g.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    return;
+  }
+  if (fit === 'wrap') {
+    /* cover full legend plane */
+    const scale = Math.max(W / iw, H / ih);
+    const dw = iw * scale, dh = ih * scale;
+    g.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    return;
+  }
+  /* fill — letterbox inside pad */
+  const scale = Math.min((W - pad * 2) / iw, (H - pad * 2) / ih);
+  const dw = iw * scale, dh = ih * scale;
+  g.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+}
+
 function legendTex(label, wU, fg, mark, opts) {
   opts = opts || {};
   const useLabel = (opts.customText !== undefined) ? opts.customText : label;
   const useFg = (opts.customFg !== undefined) ? opts.customFg : fg;
-  const useText = useLabel || '';
+  const labelHidden = !!opts.labelHidden;
+  const useText = labelHidden ? '' : (useLabel || '');
   const fs = Number(opts.fontSize);
   const fontSize = Number.isFinite(fs) ? fs : 29;
-  /* liveEdit: skip cache read so slider drags always paint a fresh atlas
-     (avoids stale GPU-bound CanvasTextures on desktop rebuild paths). */
+  const fit = opts.imageFit || (opts.imageBehindText ? 'fill' : 'wrap');
   const cacheKey = (useLabel || '') + '|' + wU + '|' + (useFg || 'nofg')
     + (mark ? '|' + mark : '')
     + (opts.imageData ? '|img' : '')
     + (opts.glow ? '|glow' : '')
-    + (opts.imageBehindText ? '|ibt' : '')
+    + '|fit' + fit
+    + (labelHidden ? '|lh' : '')
     + '|fs' + fontSize
     + (opts.textOverride ? '|to' : '');
   if (!opts.glow && !opts.liveEdit && legendCache.has(cacheKey)) {
@@ -138,24 +162,20 @@ function legendTex(label, wU, fg, mark, opts) {
   if (opts.imageData) {
     const img = new Image();
     img.src = opts.imageData;
-    const iw = img.naturalWidth || W;
-    const ih = img.naturalHeight || H;
-    const scale = Math.min((W - pad * 2) / iw, (H - pad * 2) / ih);
-    const dw = iw * scale, dh = ih * scale;
-    g.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
-    if (opts.imageBehindText && useText) {
+    drawImageFit(g, img, W, H, pad, fit);
+    if (useText && (fit === 'fill' || fit === 'sticker' || opts.imageBehindText)) {
       renderText(g, useText, useFg, fontSize, W, H, S, pad);
     }
-  } else if (opts.glow) {
+  } else if (opts.glow && useText) {
     renderText(g, useText, '#ffffff', fontSize, W, H, S, pad);
-  } else if (useText) {
-    /* A user-set text override beats themed marks/emoji (e.g. the Esc icon):
-       without this, the icon branch below short-circuits renderText and
-       typed text can never appear on marked keys. */
+  } else if (useText || mark) {
     const em = !opts.textOverride && mark && emojiImg[mark];
     if (em && em.ready) {
       const sz = Math.min(W, H) * 0.76 * markScale;
       g.drawImage(em.img, (W - sz) / 2, (H - sz) / 2, sz, sz);
+      if (useText && opts.textOverride) {
+        renderText(g, useText, useFg, fontSize, W, H, S, pad);
+      }
     } else if (!opts.textOverride && mark && MARKS[mark]) {
       g.save();
       g.translate(W / 2, H / 2);
@@ -163,7 +183,7 @@ function legendTex(label, wU, fg, mark, opts) {
       g.translate(-W / 2, -H / 2);
       MARKS[mark](g, W, H, useFg);
       g.restore();
-    } else {
+    } else if (useText) {
       renderText(g, useText, useFg, fontSize, W, H, S, pad);
     }
   }
@@ -325,14 +345,17 @@ function buildOneKey(keyDef, ri, ci, cx, cz, prof, cw, addToGroups) {
   mesh.castShadow = mesh.receiveShadow = true;
   mesh.position.set(cx, CAP_Y, cz);
   mesh.rotation.x = prof.tilt[ri];
+  const labelHidden = isLabelHidden(id);
   const effectiveLabel = getEffectiveText(id, keyDef.l);
   const effectiveFg = getEffectiveFg(id, cw[keyDef.r].fg);
   const effectiveMark = getEffectiveMark(id, markFor(keyDef.l));
-  const userMark = hasCustomText(id) ? null : effectiveMark;
+  const userMark = hasCustomText(id) || labelHidden ? null : effectiveMark;
   const effectiveImage = getEffectiveImage(id);
   const effectiveFs = getEffectiveFontSize(id, 29);
   const glow = hasGlow(id);
   const imgBehind = hasImageBehindText(id);
+  const imageFit = getImageFit(id);
+  const selected = getSelectedIds().includes(id);
 
   mesh.userData = Object.assign(mesh.userData, {
     isCap: true, baseY: CAP_Y, row: ri, col: ci,
@@ -340,13 +363,18 @@ function buildOneKey(keyDef, ri, ci, cx, cz, prof, cw, addToGroups) {
     perKeyId: id,
   });
 
-  if (effectiveLabel) {
+  /* selection chrome: slight lift */
+  if (selected) mesh.position.y = CAP_Y + 0.04;
+
+  if (effectiveLabel || effectiveImage || userMark) {
     const topW = (keyDef.w - GAP) * prof.taper * 0.92, topD = (1 - GAP) * prof.taper * 0.82;
     const texOpts = {
       customText: effectiveLabel,
       customFg: effectiveFg,
       imageData: effectiveImage,
       glow,
+      labelHidden,
+      imageFit,
       imageBehindText: imgBehind,
       fontSize: effectiveFs,
       textOverride: ((getOverride(id) || {}).customText ?? '') !== '',
@@ -492,7 +520,7 @@ export function updateKeyLegend(id) {
   const effectiveLabel = getEffectiveText(id, mesh.userData.label);
   const effectiveFg = getEffectiveFg(id, cw[role].fg);
   const effectiveMark = getEffectiveMark(id, markFor(mesh.userData.label));
-  const userMark = hasCustomText(id) ? null : effectiveMark;
+  const userMark = hasCustomText(id) || isLabelHidden(id) ? null : effectiveMark;
   const effectiveImage = getEffectiveImage(id);
   const effectiveFs = getEffectiveFontSize(id, 29);
   const glow = hasGlow(id);
@@ -503,6 +531,8 @@ export function updateKeyLegend(id) {
     imageData: effectiveImage,
     glow,
     imageBehindText: imgBehind,
+    imageFit: getImageFit(id),
+    labelHidden: isLabelHidden(id),
     fontSize: effectiveFs,
     textOverride: ((ov || {}).customText ?? '') !== '',
     liveEdit: true,
@@ -550,6 +580,16 @@ export function getKeyLabel(id) {
   return c ? c.userData.label : '';
 }
 
+/** Lift selected keys for multi-select feedback without full rebuild. */
+export function updateSelectionChrome() {
+  const sel = new Set(getSelectedIds());
+  capsGroup.children.forEach((c) => {
+    if (!c.userData?.isCap) return;
+    const base = c.userData.baseY ?? CAP_Y;
+    c.position.y = sel.has(c.userData.perKeyId) ? base + 0.04 : base;
+  });
+}
+
 export function rebuildBoard() {
   buildCase();
   buildKeys();
@@ -563,7 +603,7 @@ export function refreshLegends() {
     const effectiveLabel = getEffectiveText(id, c.userData.label);
     const effectiveFg = getEffectiveFg(id, cw[c.userData.role].fg);
     const effectiveMark = getEffectiveMark(id, markFor(c.userData.label));
-    const userMark = hasCustomText(id) ? null : effectiveMark;
+    const userMark = hasCustomText(id) || isLabelHidden(id) ? null : effectiveMark;
     const effectiveImage = getEffectiveImage(id);
     const effectiveFs = getEffectiveFontSize(id, 29);
     const glow = hasGlow(id);
@@ -574,6 +614,8 @@ export function refreshLegends() {
       imageData: effectiveImage,
       glow,
       imageBehindText: imgBehind,
+      imageFit: getImageFit(id),
+      labelHidden: isLabelHidden(id),
       fontSize: effectiveFs,
       textOverride: ((getOverride(id) || {}).customText ?? '') !== '',
     };
