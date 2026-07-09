@@ -58,21 +58,82 @@ function applyColors(cw) {
   matAccent.color.copy(sRGB(cw.x.bg));
 }
 
-function applyInstant(s) {
+/** Truthy object customColors (photo match / custom hex roles). */
+function hasCustomColors(cc) {
+  return !!(cc && typeof cc === 'object' && (cc.a || cc.m || cc.x));
+}
+
+/**
+ * Prefer customColors over named colorway when both appear in a snap
+ * (photo match leaves colorway id set while roles live in customColors).
+ * Explicit customColors: null + colorway chip clears custom and applies stock.
+ */
+function applyColorwayFields(s, { instant = true } = {}) {
   if (s.brand !== undefined) state.brand = s.brand;
-  if (s.colorway && COLORWAYS[s.colorway]) {
-    applyColors(COLORWAYS[s.colorway]);
-    state.colorway = s.colorway;
-    state.customColors = null;
-    refreshLegends();
-    if (panelRenderHook) panelRenderHook(state.section);
-  } else if (s.customColors) {
-    applyColors(s.customColors);
+
+  if (hasCustomColors(s.customColors)) {
+    if (instant) applyColors(s.customColors);
+    else {
+      tweenColor(matAlpha, s.customColors.a.bg);
+      tweenColor(matMod, s.customColors.m.bg);
+      tweenColor(matAccent, s.customColors.x.bg);
+    }
     state.customColors = s.customColors;
-    refreshLegends();
-  } else if (s.brand !== undefined) {
-    refreshLegends();
+    if (s.colorway && COLORWAYS[s.colorway]) state.colorway = s.colorway;
+    if (instant) refreshLegends();
+    else gsap.delayedCall(0.26, refreshLegends);
+    if (instant && panelRenderHook) panelRenderHook(state.section);
+    return;
   }
+
+  if (s.colorway && COLORWAYS[s.colorway]) {
+    const cw = COLORWAYS[s.colorway];
+    if (instant) applyColors(cw);
+    else {
+      tweenColor(matAlpha, cw.a.bg);
+      tweenColor(matMod, cw.m.bg);
+      tweenColor(matAccent, cw.x.bg);
+    }
+    state.colorway = s.colorway;
+    /* clear custom on stock colorway apply (chip passes customColors: null) */
+    if (s.customColors === null || s.customColors === undefined) {
+      state.customColors = null;
+    }
+    if (instant) refreshLegends();
+    else gsap.delayedCall(0.26, refreshLegends);
+    if (instant && panelRenderHook) panelRenderHook(state.section);
+    return;
+  }
+
+  if (s.customColors === null) {
+    state.customColors = null;
+    if (COLORWAYS[state.colorway]) {
+      if (instant) applyColors(COLORWAYS[state.colorway]);
+      else {
+        const cw = COLORWAYS[state.colorway];
+        tweenColor(matAlpha, cw.a.bg);
+        tweenColor(matMod, cw.m.bg);
+        tweenColor(matAccent, cw.x.bg);
+      }
+    }
+    if (instant) refreshLegends();
+    else gsap.delayedCall(0.26, refreshLegends);
+    return;
+  }
+
+  if (s.brand !== undefined) {
+    if (instant) refreshLegends();
+  }
+}
+
+/** Per-key bg/image etc. need mesh rebuild — legends alone are not enough. */
+function applyPerKeyOverridesField(ov) {
+  state.perKeyOverrides = ov && typeof ov === 'object' ? ov : {};
+  buildKeys();
+}
+
+function applyInstant(s) {
+  applyColorwayFields(s, { instant: true });
   if (s.caseColor) {
     state.caseColor = s.caseColor;
     if (s.caseCustomColor === undefined) state.caseCustomColor = null;
@@ -127,9 +188,8 @@ function applyInstant(s) {
     cableGroup.visible = state.extras.cable;
     wristGroup.visible = state.extras.wrist;
   }
-  if (s.perKeyOverrides) {
-    state.perKeyOverrides = s.perKeyOverrides;
-    refreshLegends();
+  if (s.perKeyOverrides !== undefined) {
+    applyPerKeyOverridesField(s.perKeyOverrides);
   }
 }
 
@@ -159,24 +219,18 @@ function tweenColor(mat, hex, d) {
 function apply3D(patch, animate) {
   if (!animate || RM()) {
     applyInstant(patch);
-    if (patch.layout) { state.layout = patch.layout; rebuildBoard(); }
-    if (patch.profile) { state.profile = patch.profile; buildKeys(); }
+    /* layout rebuild includes buildKeys; avoid double work if already built for overrides */
+    if (patch.layout) {
+      state.layout = patch.layout;
+      rebuildBoard();
+    } else if (patch.profile) {
+      state.profile = patch.profile;
+      /* buildKeys if applyInstant did not already (no perKeyOverrides in patch) */
+      if (patch.perKeyOverrides === undefined) buildKeys();
+    }
     return;
   }
-  if (patch.colorway && COLORWAYS[patch.colorway]) {
-    const cw = COLORWAYS[patch.colorway];
-    tweenColor(matAlpha, cw.a.bg);
-    tweenColor(matMod, cw.m.bg);
-    tweenColor(matAccent, cw.x.bg);
-    state.customColors = null;
-    gsap.delayedCall(0.26, refreshLegends);
-  }
-  if (patch.customColors) {
-    tweenColor(matAlpha, patch.customColors.a.bg);
-    tweenColor(matMod, patch.customColors.m.bg);
-    tweenColor(matAccent, patch.customColors.x.bg);
-    gsap.delayedCall(0.26, refreshLegends);
-  }
+  applyColorwayFields(patch, { instant: false });
   if (patch.caseColor) {
     if (patch.caseCustomColor === undefined) state.caseCustomColor = null;
     const cHex = state.caseCustomColor || CASES[patch.caseColor].c;
@@ -224,11 +278,21 @@ function apply3D(patch, animate) {
     if (state.exploded) setView('3d');
     rebuildBoard();
     popKeys();
+  } else if (patch.perKeyOverrides !== undefined) {
+    applyPerKeyOverridesField(patch.perKeyOverrides);
   }
-  if (patch.perKeyOverrides) {
-    state.perKeyOverrides = patch.perKeyOverrides;
-    refreshLegends();
-  }
+}
+
+/**
+ * One-shot load of a full build snap (gallery / share / saved).
+ * Instant apply so customColors + per-key faces + board tints all stick.
+ */
+export function loadSnap(snap, opts = {}) {
+  if (!snap || typeof snap !== 'object') return;
+  const patch = Object.assign({}, snap);
+  if (opts.selectedPreset !== undefined) patch.selectedPreset = opts.selectedPreset;
+  else if (patch.selectedPreset === undefined) patch.selectedPreset = null;
+  setState(patch, { animate: false, skipPanel: !!opts.skipPanel });
 }
 
 export function setState(patch, opts) {
@@ -247,7 +311,8 @@ export function undo() {
   Object.assign(state, snap);
   applyInstant(snap);
   if (snap.layout) rebuildBoard();
-  if (snap.profile) buildKeys();
+  else if (snap.profile) buildKeys();
+  /* applyInstant already buildKeys when snap has perKeyOverrides */
   if (_syncUI) _syncUI();
   return true;
 }
@@ -258,7 +323,7 @@ export function redo() {
   Object.assign(state, snap);
   applyInstant(snap);
   if (snap.layout) rebuildBoard();
-  if (snap.profile) buildKeys();
+  else if (snap.profile) buildKeys();
   if (_syncUI) _syncUI();
   return true;
 }

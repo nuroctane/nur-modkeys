@@ -1,5 +1,5 @@
 import { state } from '../core/state.js';
-import { setState, effectiveColorway } from '../core/update.js';
+import { setState, loadSnap, effectiveColorway } from '../core/update.js';
 import { LAYOUTS } from '../data/layouts.js';
 import { COLORWAYS } from '../data/colorways.js';
 import { CASES, FINISHES, PLATES, SWITCHES, MATERIALS, EXTRAS, PROFILES, LIGHT_COLORS } from '../data/components.js';
@@ -244,9 +244,7 @@ $('modalBody')?.addEventListener('click', (ev) => {
     const { galleryCache } = window.__MODKEYS__ || { galleryCache: [] };
     const t = galleryCache.find((e) => e.id === community.dataset.community);
     if (t && t.snap) {
-      const s = t.snap;
-      if (s.layout && s.layout !== state.layout) setState({ layout: s.layout });
-      setState(Object.assign({}, s, { selectedPreset: null }));
+      loadSnap(t.snap, { selectedPreset: null });
       closeModal();
       toast(t.name + ' loaded');
     }
@@ -256,10 +254,11 @@ $('modalBody')?.addEventListener('click', (ev) => {
   if (sv) {
     const { savedBuilds } = window.__MODKEYS__ || { savedBuilds: [] };
     const b = savedBuilds[parseInt(sv.dataset.saved)];
-    if (b.layout !== state.layout) setState({ layout: b.layout });
-    setState(Object.assign({}, b.snap, { selectedPreset: null }));
-    closeModal();
-    toast(b.name + ' loaded');
+    if (b && b.snap) {
+      loadSnap(b.snap, { selectedPreset: null });
+      closeModal();
+      toast(b.name + ' loaded');
+    }
     return;
   }
   const swm = ev.target.closest('[data-swm]');

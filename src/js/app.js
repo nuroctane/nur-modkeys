@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import gsap from 'gsap';
 
 import { state, stateSlice } from './core/state.js';
-import { registerSyncUI, setState, undo, redo, onPanelRender } from './core/update.js';
+import { registerSyncUI, setState, loadSnap, undo, redo, onPanelRender } from './core/update.js';
 import { rebuildBoard, preloadEmoji } from './core/keyboard.js';
 import { ctrl, setView, onKeyEditClick } from './core/controls.js';
 import {
@@ -391,7 +391,7 @@ export function mountModkeys() {
       /* restore shared URL */
       const hashData = loadHash();
       if (hashData) {
-        setState(Object.assign({}, hashData));
+        loadSnap(hashData, { selectedPreset: null });
         resetHistory(stateSlice());
       }
       genThumbs();
@@ -460,7 +460,7 @@ export function mountModkeys() {
 }
 
 function loadBuildState(buildState) {
-  setState(Object.assign({}, buildState));
+  loadSnap(buildState, { selectedPreset: null });
   resetHistory(stateSlice());
   syncUI();
 }
