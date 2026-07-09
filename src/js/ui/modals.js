@@ -308,8 +308,9 @@ document.addEventListener('keydown', async (ev) => {
   const tag = (ev.target && ev.target.tagName) || '';
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;
   ev.preventDefault();
-  const { isAdmin } = getAdminState();
-  if (isAdmin) {
+  const { isAdmin, password } = getAdminState();
+  /* Flag set from /books without stored pw still needs unlock on modkeys. */
+  if (isAdmin && password) {
     publishAdminState({ isAdmin: false, password: '' });
     toast('Admin mode off');
     if ($('modal')?.classList.contains('open') && $('modalTitle')?.textContent === 'Gallery') {

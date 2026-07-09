@@ -91,16 +91,23 @@ export function promptAdminPassword() {
         return;
       }
       try {
-        const res = await fetch('/api/modkeys/gallery/verify-admin', {
+        /* POST /api/modkeys/gallery with action — same path Vercel already
+           serves for gallery save. Multi-segment /gallery/verify-admin is
+           NOT_FOUND on Vercel (only one segment under /api/modkeys/*). */
+        const res = await fetch('/api/modkeys/gallery', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password }),
+          body: JSON.stringify({ action: 'verifyAdmin', password }),
         });
         if (res.ok) {
           publishAdminState({ isAdmin: true, password });
           finish(password);
         } else {
-          if (err) { err.style.display = 'block'; err.textContent = 'Incorrect password'; }
+          const body = await res.json().catch(() => ({}));
+          const msg = res.status === 500 && body.error
+            ? body.error
+            : 'Incorrect password';
+          if (err) { err.style.display = 'block'; err.textContent = msg; }
           if (input) input.select();
         }
       } catch {
@@ -199,10 +206,10 @@ export function promptDeleteConfirm(name) {
 
 export async function adminRenameBuild(id, name) {
   const { password } = getAdminState();
-  const res = await fetch('/api/modkeys/gallery/rename', {
+  const res = await fetch('/api/modkeys/gallery', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password, id, name }),
+    body: JSON.stringify({ action: 'rename', password, id, name }),
   });
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Rename failed');
   return res.json();
@@ -210,10 +217,10 @@ export async function adminRenameBuild(id, name) {
 
 export async function adminDeleteBuild(id) {
   const { password } = getAdminState();
-  const res = await fetch('/api/modkeys/gallery/delete', {
+  const res = await fetch('/api/modkeys/gallery', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password, id }),
+    body: JSON.stringify({ action: 'delete', password, id }),
   });
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Delete failed');
   return res.json();
