@@ -6,6 +6,7 @@ import { COLORWAYS } from '../data/colorways.js';
 import { CASES, FINISHES, PLATES, SWITCHES, MATERIALS, PROFILES, GAP } from '../data/components.js';
 import {
   renderer, scene, camera, root, caseGroup, capsGroup, knobGroup, cableGroup, wristGroup,
+  keyGlowGroup, glowPlane,
   matAlpha, matMod, matAccent, matCase, matPlate, matStem,
   capMats, applyPlateFinish, applyCapMaterial, uni, sRGB,
 } from './scene.js';
@@ -43,7 +44,9 @@ export function effectiveColorway() {
 }
 
 export function applyLight() {
-  uni.uMode.value = modes[state.light.mode] || 3;
+  /* wave is mode 0 — must use nullish coalescing, not || (0 is falsy). */
+  const m = modes[state.light.mode];
+  uni.uMode.value = m !== undefined ? m : 3;
   uni.uColor.value.set(state.light.color);
   uni.uBright.value = state.light.bright;
   const on = state.light.mode !== 'off';
@@ -51,6 +54,9 @@ export function applyLight() {
     if (c.material && c.material !== matCase && c.material !== matPlate)
       c.visible = on;
   });
+  /* glowPlane + keyGlow live on root, not caseGroup — hide them for Off too */
+  glowPlane.visible = on;
+  keyGlowGroup.visible = on;
 }
 
 function applyColors(cw) {

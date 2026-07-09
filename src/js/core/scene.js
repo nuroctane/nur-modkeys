@@ -340,6 +340,7 @@ export const uni = {
 
 const HSL = 'vec3 h2r(float h){vec3 p=abs(fract(vec3(h)+vec3(0.,.6667,.3333))*6.-3.);return clamp(p-1.,0.,1.);}';
 
+/* uMode: 0 wave, 1 static, 2 breathe, 3 off — off multiplies out all contribution */
 const skirtMat = new THREE.ShaderMaterial({
   uniforms: uni,
   side: THREE.DoubleSide,
@@ -347,6 +348,7 @@ const skirtMat = new THREE.ShaderMaterial({
   fragmentShader: HSL + `
 uniform float uTime,uBright;uniform int uMode;uniform vec3 uColor;varying vec3 vW;
 void main(){
+  if (uMode==3) { gl_FragColor = vec4(0.0); return; }
   float pulse = uMode==2 ? (0.3+0.7*(0.5+0.5*sin(uTime*2.2))) : 1.0;
   vec3 col = uMode==0 ? h2r(fract(vW.x*0.19+uTime*0.1)) : uColor;
   gl_FragColor = vec4(col*uBright*pulse*1.7, 1.0);
@@ -363,6 +365,7 @@ const glowMat = new THREE.ShaderMaterial({
   fragmentShader: HSL + `
 uniform float uTime,uBright;uniform int uMode;uniform vec3 uColor;varying vec2 vUv;
 void main(){
+  if (uMode==3) { gl_FragColor = vec4(0.0); return; }
   float pulse = uMode==2 ? (0.3+0.7*(0.5+0.5*sin(uTime*2.2))) : 1.0;
   float d = length((vUv-.5)*vec2(1.0,1.7))*2.0;
   float a = smoothstep(1.0,0.12,d)*0.5*uBright*pulse;
@@ -381,6 +384,7 @@ export const keyGlowMat = new THREE.ShaderMaterial({
   fragmentShader: HSL + `
 uniform float uTime,uBright;uniform int uMode;uniform vec3 uColor;varying vec2 vUv;varying vec3 vW;
 void main(){
+  if (uMode==3) { gl_FragColor = vec4(0.0); return; }
   float pulse = uMode==2 ? (0.3+0.7*(0.5+0.5*sin(uTime*2.2))) : 1.0;
   vec2 p = abs(vUv-0.5)*2.0;
   float d = max(p.x,p.y);
@@ -402,6 +406,7 @@ export function createLegendGlowMat() {
     fragmentShader: HSL + `
 uniform float uTime,uBright;uniform int uMode;uniform vec3 uColor;uniform sampler2D uMask;varying vec2 vUv;varying vec3 vW;
 void main(){
+  if (uMode==3) { gl_FragColor = vec4(0.0); return; }
   float pulse = uMode==2 ? (0.3+0.7*(0.5+0.5*sin(uTime*2.2))) : 1.0;
   vec4 m = texture2D(uMask, vUv);
   float mask = m.r;

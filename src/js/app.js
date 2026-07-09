@@ -345,7 +345,8 @@ export function mountModkeys() {
       const modes = { wave: 0, static: 1, breathe: 2, off: 3 };
       Object.assign(state.light, s.light);
       uni.uColor.value.set(state.light.color);
-      uni.uMode.value = modes[state.light.mode] || 3;
+      const m = modes[state.light.mode];
+      uni.uMode.value = m !== undefined ? m : 3;
       uni.uBright.value = state.light.bright;
     }
     renderer.render(scene, camera);
