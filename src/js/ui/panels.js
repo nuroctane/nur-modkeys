@@ -342,7 +342,9 @@ function buildCustomizePanel() {
   <div class="keRow"><label>Glow text</label>
     <label class="keToggle ${ov.glow ? 'on' : ''}" id="cuGlow"><span></span></label></div>
   <div class="glabel" style="margin-top:14px">EMOJI / IMAGE</div>
+  <div class="hint" style="margin-top:2px">Pick an emoji for this key. Click again or <strong>None</strong> to restore legend text.</div>
   <div class="emojiGrid" id="emojiGrid">
+    <button type="button" class="emojiBtn emojiBtnNone ${!ov.markId ? 'on' : ''}" data-emoji-clear="1" title="No emoji — show text">None</button>
     ${Object.keys(EMOJI).map((id) =>
       `<button type="button" class="emojiBtn ${ov.markId === id ? 'on' : ''}" data-emoji="${id}" title="${id}">
         <img src="${emojiUrl(EMOJI[id])}" alt="${id}" width="22" height="22"></button>`).join('')}
@@ -646,10 +648,41 @@ export function setupPanelEvents() {
       renderPanel('customize');
       return;
     }
+    const clearKeyEmoji = () => {
+      const ids = selectedOrPrimary();
+      ids.forEach((id) => {
+        const o = getOverride(id) || {};
+        delete o.markId;
+        delete o.labelHidden;
+        if (!Object.keys(o).length) clearOverride(id);
+        else {
+          /* replace store entry without re-adding nulls via setOverride */
+          state.perKeyOverrides[id] = o;
+        }
+        rebuildKey(...id.split('-').map(Number));
+      });
+      toast('Emoji cleared — legend text restored');
+      renderPanel('customize');
+    };
+    const emojiClear = ev.target.closest('[data-emoji-clear]');
+    if (emojiClear) {
+      clearKeyEmoji();
+      return;
+    }
     const emojiBtn = ev.target.closest('[data-emoji]');
     if (emojiBtn) {
-      applyKeyEditorPatch({ markId: emojiBtn.dataset.emoji, labelHidden: true });
-      selectedOrPrimary().forEach((id) => rebuildKey(...id.split('-').map(Number)));
+      const eid = emojiBtn.dataset.emoji;
+      const ids = selectedOrPrimary();
+      const primary = ids[ids.length - 1];
+      const cur = primary ? (getOverride(primary) || {}).markId : null;
+      /* re-click active emoji → deselect and restore text */
+      if (cur && cur === eid) {
+        clearKeyEmoji();
+        return;
+      }
+      applyKeyEditorPatch({ markId: eid, labelHidden: true });
+      ids.forEach((id) => rebuildKey(...id.split('-').map(Number)));
+      toast('Emoji applied');
       renderPanel('customize');
       return;
     }

@@ -237,6 +237,20 @@ export const EMOJI = {
 
 export const emojiUrl = (cp) => "https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/72x72/" + cp + ".png";
 
+/** Codepoint string (e.g. "1f431" or "2764-fe0f") → native emoji character(s). */
+export function emojiChar(cp) {
+  try {
+    return String.fromCodePoint(
+      ...String(cp)
+        .split("-")
+        .filter(Boolean)
+        .map((h) => parseInt(h, 16)),
+    );
+  } catch {
+    return "";
+  }
+}
+
 export const BRAND_MARKS = {
   claude: { Esc: "claude" },
   gemini: { Esc: "gemini" },

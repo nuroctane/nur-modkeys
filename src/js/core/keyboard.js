@@ -11,9 +11,9 @@ import {
   CAP_Y, setPlateMesh, setBoardDims, sRGB, uni,
   aoPlane, glowPlane,
 } from './scene.js';
-import { BRAND_MARKS, MARKS, EMOJI, emojiUrl } from '../data/art.js';
+import { BRAND_MARKS, MARKS, EMOJI, emojiUrl, emojiChar } from '../data/art.js';
 import {
-  getEffectiveText, getEffectiveFg, getEffectiveMark,
+  getEffectiveText, getEffectiveFg,
   getEffectiveImage, getEffectiveFontSize, hasGlow, hasImageBehindText,
   getOverride, keyId as perKeyId, getAllEntries, hasCustomText,
   isLabelHidden, getImageFit, getSelectedIds,
@@ -169,14 +169,25 @@ function legendTex(label, wU, fg, mark, opts) {
   } else if (opts.glow && useText) {
     renderText(g, useText, '#ffffff', fontSize, W, H, S, pad);
   } else if (useText || mark) {
-    const em = !opts.textOverride && mark && emojiImg[mark];
-    if (em && em.ready) {
+    const em = mark && emojiImg[mark];
+    const isEmojiId = !!(mark && EMOJI[mark]);
+    const wantMark = !!(mark && !opts.textOverride);
+
+    if (wantMark && isEmojiId) {
+      /* Twemoji when ready; native glyph while loading / if CDN fails */
       const sz = Math.min(W, H) * 0.76 * markScale;
-      g.drawImage(em.img, (W - sz) / 2, (H - sz) / 2, sz, sz);
-      if (useText && opts.textOverride) {
-        renderText(g, useText, useFg, fontSize, W, H, S, pad);
+      if (em && em.ready) {
+        g.drawImage(em.img, (W - sz) / 2, (H - sz) / 2, sz, sz);
+      } else {
+        const ch = emojiChar(EMOJI[mark]);
+        if (ch) {
+          g.font = `${Math.round(sz * 0.85)}px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif`;
+          g.textAlign = 'center';
+          g.textBaseline = 'middle';
+          g.fillText(ch, W / 2, H / 2 + sz * 0.04);
+        }
       }
-    } else if (!opts.textOverride && mark && MARKS[mark]) {
+    } else if (wantMark && MARKS[mark]) {
       g.save();
       g.translate(W / 2, H / 2);
       g.scale(markScale, markScale);
@@ -206,7 +217,11 @@ export function preloadEmoji() {
     img.onload = () => {
       rec.ready = true;
       legendCache.clear();
-      if (state.brand) refreshLegends();
+      refreshLegends();
+    };
+    img.onerror = () => {
+      /* keep ready false — legendTex falls back to native emojiChar */
+      rec.failed = true;
     };
     img.src = emojiUrl(cp);
     emojiImg[id] = rec;
@@ -215,6 +230,18 @@ export function preloadEmoji() {
 
 const markFor = (label) =>
   (BRAND_MARKS[state.brand] && BRAND_MARKS[state.brand][label]) || null;
+
+/**
+ * Legend glyph for a key. Explicit user markId (emoji picker) always wins and
+ * still shows when labelHidden (emoji mode hides text, not the emoji).
+ * Brand marks are suppressed when label is hidden or custom text is set.
+ */
+function resolveLegendMark(id, defaultLabel) {
+  const ov = getOverride(id);
+  if (ov && ov.markId) return ov.markId;
+  if (hasCustomText(id) || isLabelHidden(id)) return null;
+  return markFor(defaultLabel);
+}
 
 function disposeGroup(gr) {
   while (gr.children.length) {
@@ -348,8 +375,7 @@ function buildOneKey(keyDef, ri, ci, cx, cz, prof, cw, addToGroups) {
   const labelHidden = isLabelHidden(id);
   const effectiveLabel = getEffectiveText(id, keyDef.l);
   const effectiveFg = getEffectiveFg(id, cw[keyDef.r].fg);
-  const effectiveMark = getEffectiveMark(id, markFor(keyDef.l));
-  const userMark = hasCustomText(id) || labelHidden ? null : effectiveMark;
+  const userMark = resolveLegendMark(id, keyDef.l);
   const effectiveImage = getEffectiveImage(id);
   const effectiveFs = getEffectiveFontSize(id, 29);
   const glow = hasGlow(id);
@@ -519,12 +545,17 @@ export function updateKeyLegend(id) {
   const role = mesh.userData.role;
   const effectiveLabel = getEffectiveText(id, mesh.userData.label);
   const effectiveFg = getEffectiveFg(id, cw[role].fg);
-  const effectiveMark = getEffectiveMark(id, markFor(mesh.userData.label));
-  const userMark = hasCustomText(id) || isLabelHidden(id) ? null : effectiveMark;
+  const userMark = resolveLegendMark(id, mesh.userData.label);
   const effectiveImage = getEffectiveImage(id);
   const effectiveFs = getEffectiveFontSize(id, 29);
   const glow = hasGlow(id);
   const imgBehind = hasImageBehindText(id);
+  /* markId alone needs a legend plane — rebuild if missing */
+  if (!mesh.userData.legend && (userMark || effectiveImage || effectiveLabel)) {
+    const parts = id.split('-').map(Number);
+    if (parts.length === 2 && parts.every(Number.isFinite)) rebuildKey(parts[0], parts[1]);
+    return;
+  }
   const texOpts = {
     customText: effectiveLabel,
     customFg: effectiveFg,
@@ -598,13 +629,19 @@ export function rebuildBoard() {
 export function refreshLegends() {
   const cw = effectiveColorway();
   capsGroup.children.forEach((c) => {
-    if (!c.userData.legend) return;
+    if (!c.userData?.isCap) return;
     const id = c.userData.perKeyId;
+    const userMark = resolveLegendMark(id, c.userData.label);
     const effectiveLabel = getEffectiveText(id, c.userData.label);
-    const effectiveFg = getEffectiveFg(id, cw[c.userData.role].fg);
-    const effectiveMark = getEffectiveMark(id, markFor(c.userData.label));
-    const userMark = hasCustomText(id) || isLabelHidden(id) ? null : effectiveMark;
     const effectiveImage = getEffectiveImage(id);
+    if (!c.userData.legend) {
+      if (userMark || effectiveImage || effectiveLabel) {
+        const parts = id.split('-').map(Number);
+        if (parts.length === 2 && parts.every(Number.isFinite)) rebuildKey(parts[0], parts[1]);
+      }
+      return;
+    }
+    const effectiveFg = getEffectiveFg(id, cw[c.userData.role].fg);
     const effectiveFs = getEffectiveFontSize(id, 29);
     const glow = hasGlow(id);
     const imgBehind = hasImageBehindText(id);
