@@ -160,8 +160,21 @@ getCanvas().addEventListener('pointerdown', (ev) => {
      filtered by the 5px engage threshold below (not by blocking camera). */
   dragMode = state.tool === 'pan' || ev.button === 1 || ev.button === 2 || ev.shiftKey ? 'pan' : 'orbit';
   dragEngaged = false;
-  getStage().classList.add('grabbing');
 });
+
+/** Open hand on idle stage; fist while dragging. Clear inline canvas styles
+ *  so .stage { cursor: grab } / .stage.grabbing can win. */
+function setDragCursor(engaged) {
+  const stage = getStage();
+  const canvas = getCanvas();
+  if (engaged) {
+    stage.classList.add('grabbing');
+    canvas.style.cursor = 'grabbing';
+  } else {
+    stage.classList.remove('grabbing');
+    canvas.style.cursor = '';
+  }
+}
 
 getCanvas().addEventListener('pointermove', (ev) => {
   if (pointers.has(ev.pointerId))
@@ -169,6 +182,7 @@ getCanvas().addEventListener('pointermove', (ev) => {
   const dx = ev.clientX - lastX, dy = ev.clientY - lastY;
   lastX = ev.clientX; lastY = ev.clientY;
   if (dragMode === 'pinch' && pointers.size === 2) {
+    setDragCursor(true);
     const p = [...pointers.values()];
     const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
     ctrl.radius *= pinchD / (d || 1);
@@ -180,10 +194,12 @@ getCanvas().addEventListener('pointermove', (ev) => {
       const travelled = Math.hypot(ev.clientX - downX, ev.clientY - downY);
       if (travelled < 5) return;
       dragEngaged = true;
+      setDragCursor(true);
       lastX = ev.clientX;
       lastY = ev.clientY;
       return;
     }
+    setDragCursor(true);
     knobGroup.rotation.y -= dx * 0.02;
     const b = THREE.MathUtils.clamp(uni.uBright.value + dx * 0.004, 0.1, 1.5);
     uni.uBright.value = b;
@@ -196,11 +212,13 @@ getCanvas().addEventListener('pointermove', (ev) => {
     const travelled = Math.hypot(ev.clientX - downX, ev.clientY - downY);
     if (travelled < 5) return; /* click/tap jitter — matches endPointer's tap threshold */
     dragEngaged = true;
+    setDragCursor(true);
     lastX = ev.clientX;
     lastY = ev.clientY;
     return;
   }
   if (dragMode === 'orbit') {
+    setDragCursor(true);
     ctrl.theta -= dx * 0.0052;
     ctrl.phi -= dy * 0.0052;
     ctrl.vT = -dx * 0.0052;
@@ -208,12 +226,17 @@ getCanvas().addEventListener('pointermove', (ev) => {
     return;
   }
   if (dragMode === 'pan') {
+    setDragCursor(true);
     const f = ctrl.radius * 0.0012;
     const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
     const up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
     ctrl.target.addScaledVector(right, -dx * f).addScaledVector(up, dy * f);
     return;
   }
+  /* Idle hover: open hand on stage; pointer only when over a keycap */
+  const overKnob = knobGroup.visible && pick(knobGroup.children, ev);
+  const hit = overKnob ? null : capOf(pick(capsGroup.children, ev));
+  getCanvas().style.cursor = hit ? 'pointer' : '';
   /* While the key editor is open, freeze cap Y so the board doesn't
      bob under the popover as the pointer moves. */
   if (state.selectedKey) {
@@ -225,9 +248,6 @@ getCanvas().addEventListener('pointermove', (ev) => {
     return;
   }
 
-  const overKnob = knobGroup.visible && pick(knobGroup.children, ev);
-  const hit = overKnob ? null : capOf(pick(capsGroup.children, ev));
-  getCanvas().style.cursor = overKnob ? 'ew-resize' : hit ? 'pointer' : '';
   if (hit !== hoverCap) {
     if (hoverCap && !state.exploded) {
       if (RM()) hoverCap.position.y = hoverCap.userData.baseY;
@@ -266,7 +286,7 @@ function endPointer(ev) {
     }
   } catch { /* capture already released */ }
   pointers.delete(ev.pointerId);
-  getStage().classList.remove('grabbing');
+  setDragCursor(false);
   const moved = Math.hypot(ev.clientX - downX, ev.clientY - downY);
   /* Knob tap / double-click (not a brightness drag) */
   if (dragMode === 'knob' && !dragEngaged && moved < 5) {
