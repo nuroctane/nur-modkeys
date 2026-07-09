@@ -7,6 +7,7 @@ import { setOverride, clearOverride, getOverride } from '../core/perKey.js';
 import { loadImage, validateImageFile } from '../core/imageLoader.js';
 import { MARKS } from '../data/art.js';
 import { rebuildKey, getKeyLabel, updateKeyLegend } from '../core/keyboard.js';
+import { applyPlateFinish } from '../core/scene.js';
 import { toast } from './toast.js';
 
 const $ = (id) => document.getElementById(id);
@@ -290,7 +291,11 @@ export function setupPanelEvents() {
       return;
     }
     if (ev.target.id === 'plateColorReset') {
-      setState({ plateColor: null });
+      setState({ plateColor: null }, { skipPanel: true, animate: false });
+      const el = $('plateColor');
+      if (el) el.value = PLATES[state.plate].c;
+      const dot = $('dotPlate');
+      if (dot) dot.style.background = PLATES[state.plate].c;
       return;
     }
     if (ev.target.id === 'applyCustomColors') {
@@ -315,14 +320,20 @@ export function setupPanelEvents() {
       return;
     }
   });
+  /* Live plate tint: do NOT setState on every input tick — that re-renders
+     the whole panel (kills the native color picker) and floods undo history.
+     Apply material directly; commit history once on change. */
   panelBody.addEventListener('input', (ev) => {
-    if (ev.target.id === 'plateColor') {
-      setState({ plateColor: ev.target.value });
-    }
+    if (ev.target.id !== 'plateColor') return;
+    const hex = ev.target.value;
+    state.plateColor = hex;
+    applyPlateFinish(state.plate, hex);
+    const dot = $('dotPlate');
+    if (dot) dot.style.background = hex;
   });
   panelBody.addEventListener('change', async (ev) => {
     if (ev.target.id === 'plateColor') {
-      setState({ plateColor: ev.target.value });
+      setState({ plateColor: ev.target.value }, { skipPanel: true, animate: false });
       return;
     }
     if (!_currentEditId) return;

@@ -144,13 +144,14 @@ getCanvas().addEventListener('pointerdown', (ev) => {
     const p = [...pointers.values()];
     pinchD = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
     dragMode = 'pinch';
+    dragEngaged = true;
     return;
   }
   const hitKnob = pick(knobGroup.visible ? knobGroup.children : [], ev);
-  if (hitKnob) { dragMode = 'knob'; return; }
-  /* Camera stays put while the key editor is open (tap bookkeeping in
-     endPointer still lets a double-tap switch to editing another key). */
-  if (state.selectedKey) { dragMode = null; dragEngaged = false; return; }
+  if (hitKnob) { dragMode = 'knob'; dragEngaged = true; return; }
+  /* Orbit/pan always allowed — including while the key editor is open — so
+     users can reframe the board mid-edit. Accidental click/tap jitter is
+     filtered by the 5px engage threshold below (not by blocking camera). */
   dragMode = state.tool === 'pan' || ev.button === 1 || ev.button === 2 || ev.shiftKey ? 'pan' : 'orbit';
   dragEngaged = false;
   getStage().classList.add('grabbing');
@@ -235,16 +236,22 @@ function settleCap(cap) {
 
 let lastClickKey = null, lastClickTime = 0;
 function endPointer(ev) {
+  try {
+    if (getCanvas().hasPointerCapture?.(ev.pointerId)) {
+      getCanvas().releasePointerCapture(ev.pointerId);
+    }
+  } catch { /* capture already released */ }
   pointers.delete(ev.pointerId);
   getStage().classList.remove('grabbing');
   const moved = Math.hypot(ev.clientX - downX, ev.clientY - downY);
-  if ((dragMode === 'orbit' || (dragMode === null && state.selectedKey)) && moved < 5) {
+  /* Only treat as key tap when we never engaged a real drag */
+  if ((dragMode === 'orbit' || dragMode === 'pan') && !dragEngaged && moved < 5) {
     const hit = capOf(pick(capsGroup.children, ev));
     if (hit && !state.exploded) {
       const now = Date.now();
       if (hit === lastClickKey && now - lastClickTime < 350) {
-        /* Double-click → key editor: cancel the first-click press/hover
-           so the board stays still while the user edits. */
+        /* Double-click → key editor: kill residual press + camera inertia
+           from the first click; intentional orbit still works after open. */
         settleCap(hit);
         if (hoverCap && hoverCap !== hit) settleCap(hoverCap);
         hoverCap = null;
@@ -254,12 +261,16 @@ function endPointer(ev) {
         if (onKeyEdit) onKeyEdit(hit.userData);
         lastClickKey = null;
         lastClickTime = 0;
+        dragMode = null;
+        dragEngaged = false;
         return;
       }
-      /* Don't press-animate while editor is already open (stable framing). */
+      /* While editor open: allow double-tap to switch keys, no press anim */
       if (state.selectedKey) {
         lastClickKey = hit;
         lastClickTime = now;
+        dragMode = null;
+        dragEngaged = false;
         return;
       }
       lastClickKey = hit;
@@ -275,6 +286,7 @@ function endPointer(ev) {
     }
   }
   dragMode = null;
+  dragEngaged = false;
 }
 getCanvas().addEventListener('pointerup', endPointer);
 getCanvas().addEventListener('pointercancel', endPointer);
