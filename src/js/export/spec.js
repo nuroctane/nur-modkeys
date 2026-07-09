@@ -69,6 +69,11 @@ export function generateSpec() {
 
     plate: {
       material: PLATES[state.plate].name,
+      materialId: state.plate,
+      color: state.plateColor || PLATES[state.plate].c,
+      colorIsCustom: !!state.plateColor,
+      metalness: PLATES[state.plate].metal,
+      roughness: PLATES[state.plate].rough,
       thickness: '1.5mm',
     },
 

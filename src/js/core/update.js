@@ -7,7 +7,7 @@ import { CASES, FINISHES, PLATES, SWITCHES, MATERIALS, PROFILES, GAP } from '../
 import {
   renderer, scene, camera, root, caseGroup, capsGroup, knobGroup, cableGroup, wristGroup,
   matAlpha, matMod, matAccent, matCase, matPlate, matStem,
-  capMats, applyPlateFinish, uni, sRGB,
+  capMats, applyPlateFinish, applyCapMaterial, uni, sRGB,
 } from './scene.js';
 import { rebuildBoard, buildKeys, refreshLegends, preloadEmoji } from './keyboard.js';
 import { setView } from './controls.js';
@@ -85,23 +85,22 @@ function applyInstant(s) {
     state.finish = s.finish;
   }
   if (s.plate) {
-    matPlate.color.copy(sRGB(PLATES[s.plate].c));
-    applyPlateFinish(s.plate);
     state.plate = s.plate;
+    /* switching material type resets tint to that plate's default unless plateColor also provided */
+    if (s.plateColor === undefined) state.plateColor = null;
+  }
+  if (s.plateColor !== undefined) {
+    state.plateColor = s.plateColor;
+  }
+  if (s.plate || s.plateColor !== undefined) {
+    applyPlateFinish(state.plate, state.plateColor || PLATES[state.plate].c);
   }
   if (s.sw) {
     matStem.color.copy(sRGB(SWITCHES[s.sw].dot));
     state.sw = s.sw;
   }
   if (s.material) {
-    const m = MATERIALS[s.material];
-    [matAlpha, matMod, matAccent].forEach((mm) => {
-      mm.roughness = m.rough;
-      mm.clearcoat = m.cc;
-      mm.clearcoatRoughness = m.ccr;
-      mm.bumpScale = m.bump;
-      mm.envMapIntensity = m.env;
-    });
+    applyCapMaterial(s.material);
     state.material = s.material;
   }
   if (s.light) {
@@ -170,17 +169,19 @@ function apply3D(patch, animate) {
     gsap.to(matCase, { metalness: f.metal, roughness: f.rough, clearcoat: f.cc, duration: 0.5 });
   }
   if (patch.plate) {
-    tweenColor(matPlate, PLATES[patch.plate].c);
-    applyPlateFinish(patch.plate);
+    if (patch.plateColor === undefined) state.plateColor = null;
+    const hex = state.plateColor || PLATES[patch.plate].c;
+    tweenColor(matPlate, hex);
+    applyPlateFinish(patch.plate, hex);
+  }
+  if (patch.plateColor !== undefined && !patch.plate) {
+    const hex = patch.plateColor || PLATES[state.plate].c;
+    tweenColor(matPlate, hex);
+    applyPlateFinish(state.plate, hex);
   }
   if (patch.sw) tweenColor(matStem, SWITCHES[patch.sw].dot, 0.4);
   if (patch.material) {
-    const m = MATERIALS[patch.material];
-    [matAlpha, matMod, matAccent].forEach((mm) => {
-      gsap.to(mm, { roughness: m.rough, clearcoat: m.cc, clearcoatRoughness: m.ccr, duration: 0.5 });
-      mm.bumpScale = m.bump;
-      mm.envMapIntensity = m.env;
-    });
+    applyCapMaterial(patch.material);
   }
   if (patch.light) applyLight();
   if (patch.extras !== undefined) {

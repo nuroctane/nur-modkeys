@@ -299,7 +299,11 @@ export function mountModkeys() {
       }
     }
     if (snap.caseColor) matCase.color.copy(sRGB(CASES[snap.caseColor].c));
-    if (snap.plate) { matPlate.color.copy(sRGB(PLATES[snap.plate].c)); applyPlateFinish(snap.plate); }
+    if (snap.plate || snap.plateColor !== undefined) {
+      const pid = snap.plate || state.plate;
+      const phex = snap.plateColor !== undefined ? snap.plateColor : (state.plateColor || PLATES[pid].c);
+      applyPlateFinish(pid, phex || PLATES[pid].c);
+    }
     if (snap.sw) matStem.color.copy(sRGB(SWITCHES[snap.sw].dot));
   }
   function renderSnapThumb(s) {
@@ -317,7 +321,11 @@ export function mountModkeys() {
       if (cc.x && cc.x.bg) matAccent.color.copy(sRGB(cc.x.bg));
     }
     if (s.caseColor) matCase.color.copy(sRGB(CASES[s.caseColor].c));
-    if (s.plate) { matPlate.color.copy(sRGB(PLATES[s.plate].c)); applyPlateFinish(s.plate); }
+    if (s.plate || s.plateColor !== undefined) {
+      const pid = s.plate || state.plate;
+      const phex = s.plateColor != null ? s.plateColor : (state.plateColor || PLATES[pid].c);
+      applyPlateFinish(pid, phex || PLATES[pid].c);
+    }
     if (s.sw) matStem.color.copy(sRGB(SWITCHES[s.sw].dot));
     if (s.light) {
       const modes = { wave: 0, static: 1, breathe: 2, off: 3 };

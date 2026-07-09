@@ -138,19 +138,176 @@ const matCase = new THREE.MeshPhysicalMaterial({
   envMapIntensity: 1.1,
 });
 
+/* Procedural plate material textures — metalness/roughness still come from
+   PLATES[id]; these maps give optical identity (weave, brush, PCB grain).
+   Color multiplies the map so a custom plateColor tints the texture. */
+function makeCanvasTex(draw, size = 256, repeat = 4) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  draw(c.getContext('2d'), size);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(repeat, repeat);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+function plateTextureFor(id) {
+  if (id === 'carbon') {
+    return makeCanvasTex((g, s) => {
+      g.fillStyle = '#1a1b1f';
+      g.fillRect(0, 0, s, s);
+      const step = 8;
+      for (let y = 0; y < s; y += step) {
+        for (let x = 0; x < s; x += step) {
+          const on = ((x / step) + (y / step)) % 2 === 0;
+          g.fillStyle = on ? '#2c2e34' : '#121316';
+          g.fillRect(x, y, step, step);
+          g.strokeStyle = 'rgba(255,255,255,0.06)';
+          g.strokeRect(x + 0.5, y + 0.5, step - 1, step - 1);
+        }
+      }
+      /* diagonal tow highlight */
+      g.strokeStyle = 'rgba(180,190,210,0.08)';
+      g.lineWidth = 1;
+      for (let i = -s; i < s * 2; i += 6) {
+        g.beginPath();
+        g.moveTo(i, 0);
+        g.lineTo(i + s, s);
+        g.stroke();
+      }
+    }, 256, 6);
+  }
+  if (id === 'fr4') {
+    return makeCanvasTex((g, s) => {
+      g.fillStyle = '#3d4a38';
+      g.fillRect(0, 0, s, s);
+      for (let i = 0; i < 4000; i++) {
+        const x = Math.random() * s, y = Math.random() * s;
+        const v = (80 + Math.random() * 60) | 0;
+        g.fillStyle = `rgba(${v},${v + 20},${v - 10},0.35)`;
+        g.fillRect(x, y, 1 + Math.random() * 2, 1);
+      }
+      g.strokeStyle = 'rgba(0,0,0,0.15)';
+      g.lineWidth = 1;
+      for (let i = 0; i < s; i += 16) {
+        g.beginPath(); g.moveTo(i, 0); g.lineTo(i, s); g.stroke();
+        g.beginPath(); g.moveTo(0, i); g.lineTo(s, i); g.stroke();
+      }
+    }, 256, 3);
+  }
+  if (id === 'poly' || id === 'pom') {
+    return makeCanvasTex((g, s) => {
+      const grd = g.createLinearGradient(0, 0, s, s);
+      grd.addColorStop(0, '#f4f6f8');
+      grd.addColorStop(1, '#d8dde3');
+      g.fillStyle = grd;
+      g.fillRect(0, 0, s, s);
+      for (let i = 0; i < 2000; i++) {
+        const v = (200 + Math.random() * 40) | 0;
+        g.fillStyle = `rgba(${v},${v},${v},0.4)`;
+        g.fillRect(Math.random() * s, Math.random() * s, 1, 1);
+      }
+    }, 128, 2);
+  }
+  /* brushed metals: aluminum, brass, copper, steel */
+  return makeCanvasTex((g, s) => {
+    g.fillStyle = '#c8c8c8';
+    g.fillRect(0, 0, s, s);
+    for (let y = 0; y < s; y++) {
+      const v = (140 + Math.random() * 70) | 0;
+      g.fillStyle = `rgb(${v},${v},${v})`;
+      g.fillRect(0, y, s, 1);
+      if (Math.random() > 0.92) {
+        g.fillStyle = `rgba(255,255,255,${0.08 + Math.random() * 0.12})`;
+        g.fillRect(0, y, s, 1);
+      }
+    }
+  }, 256, id === 'steel' ? 8 : 5);
+}
+
+const plateTexCache = {};
+function getPlateTexture(id) {
+  if (!plateTexCache[id]) plateTexCache[id] = plateTextureFor(id);
+  return plateTexCache[id];
+}
+
+/* Distinct keycap surface maps: PBT gritty, ABS smoother swirl, ceramic fine glaze */
+const capSurfaceTex = {
+  pbt: noiseTex,
+  abs: (() => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const g = c.getContext('2d'), im = g.createImageData(128, 128);
+    for (let i = 0; i < im.data.length; i += 4) {
+      const v = (150 + Math.random() * 12) | 0;
+      im.data[i] = im.data[i + 1] = im.data[i + 2] = v;
+      im.data[i + 3] = 255;
+    }
+    g.putImageData(im, 0, 0);
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(3, 3);
+    return t;
+  })(),
+  ceramic: (() => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const g = c.getContext('2d');
+    g.fillStyle = '#e8e8e8';
+    g.fillRect(0, 0, 128, 128);
+    for (let i = 0; i < 800; i++) {
+      g.fillStyle = `rgba(255,255,255,${Math.random() * 0.15})`;
+      g.beginPath();
+      g.arc(Math.random() * 128, Math.random() * 128, Math.random() * 3, 0, Math.PI * 2);
+      g.fill();
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(2, 2);
+    return t;
+  })(),
+};
+
 const matPlate = new THREE.MeshStandardMaterial({
   color: sRGB(PLATES[state.plate].c),
   metalness: PLATES[state.plate].metal,
   roughness: PLATES[state.plate].rough,
   envMapIntensity: PLATES[state.plate].env,
+  map: getPlateTexture(state.plate),
+  bumpMap: getPlateTexture(state.plate),
+  bumpScale: 0.012,
 });
 
-export function applyPlateFinish(id) {
-  const pl = PLATES[id];
+/** Apply plate material type (texture/metal) + optional custom color tint. */
+export function applyPlateFinish(id, colorHex) {
+  const pl = PLATES[id] || PLATES.brass;
+  const hex = colorHex || pl.c;
+  matPlate.color.copy(sRGB(hex));
   matPlate.metalness = pl.metal;
   matPlate.roughness = pl.rough;
   matPlate.envMapIntensity = pl.env;
+  const tex = getPlateTexture(id);
+  matPlate.map = tex;
+  matPlate.bumpMap = tex;
+  matPlate.bumpScale = id === 'carbon' ? 0.02 : id === 'fr4' ? 0.015 : 0.01;
   matPlate.needsUpdate = true;
+}
+
+/** Switch keycap surface map when PBT/ABS/Ceramic changes. */
+export function applyCapMaterial(id) {
+  const m = MATERIALS[id] || MATERIALS.pbt;
+  const map = capSurfaceTex[id] || noiseTex;
+  [matAlpha, matMod, matAccent].forEach((mm) => {
+    mm.roughness = m.rough;
+    mm.clearcoat = m.cc;
+    mm.clearcoatRoughness = m.ccr;
+    mm.bumpMap = map;
+    mm.bumpScale = m.bump;
+    mm.envMapIntensity = m.env;
+    mm.needsUpdate = true;
+  });
 }
 
 const matSwBody = new THREE.MeshStandardMaterial({

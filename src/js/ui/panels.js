@@ -34,7 +34,7 @@ export function syncUI(skipPanel) {
   $('dotKeycaps').style.background = cw.a.bg;
   $('dotSwitches').style.background = SWITCHES[state.sw].dot;
   $('dotCase').style.background = CASES[state.caseColor].c;
-  $('dotPlate').style.background = PLATES[state.plate].c;
+  $('dotPlate').style.background = state.plateColor || PLATES[state.plate].c;
   $('dotLight').style.cssText = lightDotStyle();
   $('layoutVal').textContent = LAYOUTS[state.layout].pct;
   document.querySelectorAll('#builds .bcard').forEach((b) =>
@@ -138,12 +138,23 @@ const PANELS = {
     state.finish, 'finish',
   )}`,
 
-  plate: () => `
+  plate: () => {
+    const pl = PLATES[state.plate];
+    const hex = state.plateColor || pl.c;
+    return `
 <div class="glabel">MATERIAL</div>${chipRow(
     Object.entries(PLATES).map(([id, p]) => [id, p.name]),
     state.plate, 'plate',
   )}
-<div class="hint" style="margin-top:10px">${PLATES[state.plate].tag}</div>`,
+<div class="hint" style="margin-top:10px">${pl.tag} · texture stays with material; color tints it</div>
+<div class="glabel" style="margin-top:16px">COLOR</div>
+<div class="keRow" style="margin-top:6px">
+  <label>Plate</label>
+  <input type="color" id="plateColor" class="keColor" value="${hex}">
+  <button type="button" class="keBtn" id="plateColorReset" title="Reset to material default">Default</button>
+</div>
+<div class="hint" style="margin-top:6px">Default for ${pl.name}: ${pl.c}</div>`;
+  },
 
   lighting: () => `
 <div class="glabel">MODE</div>${chipRow([
@@ -272,10 +283,14 @@ export function setupPanelEvents() {
       if (act === 'sw') { setState({ sw: v, selectedPreset: null }); return; }
       if (act === 'caseColor') { setState({ caseColor: v }); return; }
       if (act === 'finish') { setState({ finish: v }); return; }
-      if (act === 'plate') { setState({ plate: v }); return; }
+      if (act === 'plate') { setState({ plate: v, plateColor: null }); return; }
       if (act === 'lightMode') { setState({ light: { mode: v } }); return; }
       if (act === 'lightColor') { setState({ light: { color: v } }); return; }
       if (act === 'extras') { const e = {}; e[v] = !state.extras[v]; setState({ extras: e }); return; }
+      return;
+    }
+    if (ev.target.id === 'plateColorReset') {
+      setState({ plateColor: null });
       return;
     }
     if (ev.target.id === 'applyCustomColors') {
@@ -300,7 +315,16 @@ export function setupPanelEvents() {
       return;
     }
   });
+  panelBody.addEventListener('input', (ev) => {
+    if (ev.target.id === 'plateColor') {
+      setState({ plateColor: ev.target.value });
+    }
+  });
   panelBody.addEventListener('change', async (ev) => {
+    if (ev.target.id === 'plateColor') {
+      setState({ plateColor: ev.target.value });
+      return;
+    }
     if (!_currentEditId) return;
     if (ev.target.id === 'keImageSidebar') {
       const file = ev.target.files[0];

@@ -8,6 +8,8 @@ const state = {
   caseColor: 'porcelain',
   finish: 'anodized',
   plate: 'brass',
+  /** Custom plate tint (hex). null → use PLATES[plate].c default for that material. */
+  plateColor: null,
   light: { mode: 'static', color: '#cc785c', bright: 0.7 },
   extras: { knob: true, cable: false, wrist: false, lube: false },
   tool: 'orbit',
@@ -32,6 +34,7 @@ export function stateSlice() {
     caseColor: state.caseColor,
     finish: state.finish,
     plate: state.plate,
+    plateColor: state.plateColor,
     sw: state.sw,
     material: state.material,
     light: state.light,

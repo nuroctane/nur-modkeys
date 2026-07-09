@@ -117,6 +117,7 @@ export function setView(v) {
 
 /* pointer interaction */
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let dragEngaged = false;
 let pointers = new Map(), dragMode = null,
   lastX = 0, lastY = 0, downX = 0, downY = 0,
   pinchD = 0, hoverCap = null;
@@ -147,7 +148,11 @@ getCanvas().addEventListener('pointerdown', (ev) => {
   }
   const hitKnob = pick(knobGroup.visible ? knobGroup.children : [], ev);
   if (hitKnob) { dragMode = 'knob'; return; }
+  /* Camera stays put while the key editor is open (tap bookkeeping in
+     endPointer still lets a double-tap switch to editing another key). */
+  if (state.selectedKey) { dragMode = null; dragEngaged = false; return; }
   dragMode = state.tool === 'pan' || ev.button === 1 || ev.button === 2 || ev.shiftKey ? 'pan' : 'orbit';
+  dragEngaged = false;
   getStage().classList.add('grabbing');
 });
 
@@ -170,6 +175,14 @@ getCanvas().addEventListener('pointermove', (ev) => {
     state.light.bright = b;
     const sl = document.querySelector('#brightSlider');
     if (sl) sl.value = b;
+    return;
+  }
+  if ((dragMode === 'orbit' || dragMode === 'pan') && !dragEngaged) {
+    const travelled = Math.hypot(ev.clientX - downX, ev.clientY - downY);
+    if (travelled < 5) return; /* click/tap jitter — matches endPointer's tap threshold */
+    dragEngaged = true;
+    lastX = ev.clientX;
+    lastY = ev.clientY;
     return;
   }
   if (dragMode === 'orbit') {
@@ -225,7 +238,7 @@ function endPointer(ev) {
   pointers.delete(ev.pointerId);
   getStage().classList.remove('grabbing');
   const moved = Math.hypot(ev.clientX - downX, ev.clientY - downY);
-  if (dragMode === 'orbit' && moved < 5) {
+  if ((dragMode === 'orbit' || (dragMode === null && state.selectedKey)) && moved < 5) {
     const hit = capOf(pick(capsGroup.children, ev));
     if (hit && !state.exploded) {
       const now = Date.now();
@@ -235,6 +248,8 @@ function endPointer(ev) {
         settleCap(hit);
         if (hoverCap && hoverCap !== hit) settleCap(hoverCap);
         hoverCap = null;
+        ctrl.vT = 0;
+        ctrl.vP = 0;
         state.selectedKey = hit.userData.perKeyId;
         if (onKeyEdit) onKeyEdit(hit.userData);
         lastClickKey = null;
