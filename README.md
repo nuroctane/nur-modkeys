@@ -135,4 +135,5 @@ MIT
 
 ---
 
-*Built by [nuroctane](https://nuroctane.xyz) · [github.com/nuroctane](https://github.com/nuroctane)*
+*Built by [nuroctane](https://nuroctane.xyz) · [github.com/nuroctane](https://github.com/nuroctane)*  
+*Inspired by [thebuggeddev/modkeys](https://github.com/thebuggeddev/modkeys)*
