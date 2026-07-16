@@ -3,7 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>MODKEYS — Keyboard Configurator</title>
+    <title>MODKEYS — Keyboard Configurator · nuroctane.xyz</title>
+    <meta name="description" content="MODKEYS — browser mechanical keyboard configurator with 3D preview, photo match, per-key customization, and export. Live at nuroctane.xyz/modkeys." />
+    <meta name="author" content="nuroctane" />
+    <link rel="canonical" href="https://nuroctane.xyz/modkeys" />
     <link rel="icon" type="image/png" href="/assets/nodes/modkeys-logo.png" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" />
@@ -319,8 +322,8 @@
     <script type="module">
       import { selectShell } from '/src/js/shell.js';
       selectShell();
-      /* Standalone deploy (modkeys.vercel.app): inject Web Analytics when the
-         package is available. SPA embed skips this boot path entirely. */
+      /* Standalone deploy: inject Web Analytics when available.
+         Site embed on nuroctane.xyz/modkeys skips this boot path. */
       try {
         const { inject } = await import('@vercel/analytics');
         inject({

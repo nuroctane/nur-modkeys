@@ -6,9 +6,7 @@
 
 A browser-based mechanical keyboard configurator and 3D visualization tool. Build, customize, and share your dream keyboard — entirely in the browser, on desktop and mobile.
 
-**[Try it live](https://modkeys.vercel.app/)** · also embedded at [nuroctane.xyz/modkeys](https://nuroctane.xyz/modkeys)
-
-**Inspiration:** [thebuggeddev/modkeys](https://github.com/thebuggeddev/modkeys) — original project this configurator builds on.
+**[Live on nuroctane.xyz](https://nuroctane.xyz/modkeys)** · part of [nuroctane.xyz](https://nuroctane.xyz)
 
 ---
 
@@ -137,4 +135,4 @@ MIT
 
 ---
 
-*Built with curiosity by [nur](https://github.com/anomalyco)*
+*Built by [nuroctane](https://nuroctane.xyz) · [github.com/nuroctane](https://github.com/nuroctane)*

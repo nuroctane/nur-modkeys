@@ -1,7 +1,7 @@
 /**
  * Photo → board colour sampling (classical CV pipeline).
  *
- * Pipeline (inspired by thebuggeddev/modkeys, modularized):
+ * Pipeline (photo → board detect → role colors → key paint):
  *  1. Downscale for analysis
  *  2. detectBoardBox — largest non-background connected component
  *  3. extractPalette — k-means + median swatches + vivid accent rescue
