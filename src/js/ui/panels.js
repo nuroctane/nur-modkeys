@@ -10,7 +10,7 @@ import {
 import { loadImage, validateImageFile } from '../core/imageLoader.js';
 import { EMOJI, emojiUrl } from '../data/art.js';
 import { rebuildKey, rebuildKnob, getKeyLabel, updateKeyLegend, updateSelectionChrome } from '../core/keyboard.js';
-import { applyPlateFinish, matCase, matStem, sRGB } from '../core/scene.js';
+import { applyPlateFinish, capMats, matCase, matStem, sRGB } from '../core/scene.js';
 import { toast } from './toast.js';
 import {
   loadPhotoFile, hasPhotoSession, photoPreviewUrl,
@@ -111,6 +111,21 @@ function swatchRow(items, cur, act) {
     '</div>';
 }
 
+/* Custom Colors picker id → [role, part] */
+const HEX_ROLE = {
+  hexAbg: ['a', 'bg'], hexAfg: ['a', 'fg'],
+  hexMbg: ['m', 'bg'], hexMfg: ['m', 'fg'],
+  hexXbg: ['x', 'bg'], hexXfg: ['x', 'fg'],
+};
+
+function readCustomColors() {
+  return {
+    a: { bg: $('hexAbg').value, fg: $('hexAfg').value },
+    m: { bg: $('hexMbg').value, fg: $('hexMfg').value },
+    x: { bg: $('hexXbg').value, fg: $('hexXfg').value },
+  };
+}
+
 function hexRow(label, id, val) {
   return `<div class="hexRow"><span class="hexLabel">${label}</span><input type="color" class="hexInput" id="${id}" value="${val || '#000000'}"></div>`;
 }
@@ -138,11 +153,11 @@ const PANELS = {
     const cc = state.customColors;
     return `
 <div class="preview">${[
-  { w: 1.1, h: 1.1, x: 38, y: 24, c: cw.m.bg, f: cw.m.fg, l: 'TAB' },
-  { w: 1.1, h: 1.1, x: 86, y: 24, c: cw.a.bg, f: cw.a.fg, l: 'Q' },
-  { w: 1.1, h: 1.1, x: 134, y: 24, c: cw.x.bg, f: cw.x.fg, l: 'S' },
-  { w: 1.9, h: 0.45, x: 18, y: 106, c: cw.m.bg, f: cw.m.fg, l: 'MODKEYS' },
-].map(k => `<div class="kc" style="left:${k.x}px;top:${k.y}px;width:${k.w * 48}px;height:${k.h * 46}px;background:${k.c};color:${k.f}"><div class="kctop">${k.l}</div></div>`).join('')}</div>
+  { w: 1.1, h: 1.1, x: 38, y: 24, r: 'm', l: 'TAB' },
+  { w: 1.1, h: 1.1, x: 86, y: 24, r: 'a', l: 'Q' },
+  { w: 1.1, h: 1.1, x: 134, y: 24, r: 'x', l: 'S' },
+  { w: 1.9, h: 0.45, x: 18, y: 106, r: 'm', l: 'MODKEYS' },
+].map(k => `<div class="kc" data-role="${k.r}" style="left:${k.x}px;top:${k.y}px;width:${k.w * 48}px;height:${k.h * 46}px;--bg:${cw[k.r].bg};--fg:${cw[k.r].fg}"><div class="kctop">${k.l}</div></div>`).join('')}</div>
 <div class="grp"><div class="glabel">PROFILE</div>${Object.entries(PROFILES).map(([id, p]) =>
   `<button class="profBtn ${state.profile === id ? 'on' : ''}" data-act="profile" data-v="${id}"><svg width="40" height="22" viewBox="0 0 40 22"><path d="${PROFILE_ICONS[id]}" fill="currentColor"/></svg></button>`
 ).join('')}</div>
@@ -161,8 +176,7 @@ const PANELS = {
   <div class="hexCol"><div class="hexTitle">Mod</div>${hexRow('BG', 'hexMbg', (cc && cc.m.bg) || cw.m.bg)}${hexRow('FG', 'hexMfg', (cc && cc.m.fg) || cw.m.fg)}</div>
   <div class="hexCol"><div class="hexTitle">Accent</div>${hexRow('BG', 'hexXbg', (cc && cc.x.bg) || cw.x.bg)}${hexRow('FG', 'hexXfg', (cc && cc.x.fg) || cw.x.fg)}</div>
 </div>
-<button class="libBtn" id="applyCustomColors" style="margin-top:6px">Apply Custom Colors</button>
-<button class="libBtn" id="clearCustomColors" style="margin-top:4px">Reset to Colorway</button>
+<button class="libBtn" id="clearCustomColors" style="margin-top:6px">Reset to Colorway</button>
 </div>
 <div class="grp" style="margin-top:12px;border-top:1px solid var(--card2);padding-top:12px">
   <div class="glabel">KEY IMAGE</div>
@@ -581,15 +595,6 @@ export function setupPanelEvents() {
       if (dot) dot.style.background = SWITCHES[state.sw].dot;
       return;
     }
-    if (ev.target.id === 'applyCustomColors') {
-      const cc = {
-        a: { bg: $('hexAbg').value, fg: $('hexAfg').value },
-        m: { bg: $('hexMbg').value, fg: $('hexMfg').value },
-        x: { bg: $('hexXbg').value, fg: $('hexXfg').value },
-      };
-      setState({ customColors: cc });
-      return;
-    }
     if (ev.target.id === 'clearCustomColors') {
       setState({ colorway: state.colorway, customColors: null });
       return;
@@ -827,6 +832,14 @@ export function setupPanelEvents() {
       applyKeyEditorPatch({ fontSize: Number.isFinite(n) ? n : 29 });
       return;
     }
+    if (HEX_ROLE[id]) {
+      const [role, part] = HEX_ROLE[id];
+      if (part === 'bg') capMats[role].color.copy(sRGB(hex));
+      document.querySelectorAll(`.preview .kc[data-role="${role}"]`).forEach((kc) => {
+        kc.style.setProperty(`--${part}`, hex);
+      });
+      return;
+    }
     if (id === 'plateColor') {
       state.plateColor = hex;
       applyPlateFinish(state.plate, hex);
@@ -896,6 +909,10 @@ export function setupPanelEvents() {
     }
     if (ev.target.id === 'cuBg') {
       setState({ perKeyOverrides: state.perKeyOverrides }, { skipPanel: true, animate: false });
+      return;
+    }
+    if (HEX_ROLE[ev.target.id]) {
+      setState({ customColors: readCustomColors() }, { skipPanel: true });
       return;
     }
     if (ev.target.id === 'plateColor') {
