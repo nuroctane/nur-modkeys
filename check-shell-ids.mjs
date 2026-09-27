@@ -24,7 +24,7 @@ const DYNAMIC = new Set([
   'photoCopyAll','photoCopySel','photoRecopy','photoClear',
   'cuBg','cuFg','cuText','cuFs','cuGlow','cuLabelShown','cuImage','cuRemoveArt',
   'cuUseColorway','cuFgAuto','cuResetOne','resetAllKeys','selClear','multiSelectToggle',
-  'emojiGrid','libOpen','applyCustomColors','clearCustomColors',
+  'emojiGrid','libOpen','clearCustomColors',
   'hexAbg','hexAfg','hexMbg','hexMfg','hexXbg','hexXfg',
   'keImageSidebar','keSidebarPreview','keRemoveImgSidebar',
   'plateColorReset','caseColorReset','switchColorReset',
